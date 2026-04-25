@@ -2,7 +2,8 @@
 
 {
   # https://devenv.sh/basics/
-  env.GREET = "devenv";
+  env.GREET = "nirip";
+  env.PROJECT_DIR = "/home/andrew/Documents/Projects/nirip";
 
   # https://devenv.sh/packages/
   packages = [ 
@@ -29,7 +30,7 @@
 
   # https://devenv.sh/scripts/
   scripts.hello.exec = ''
-    echo hello from $GREET
+    echo "hello from $GREET at $PROJECT_DIR"
   '';
 
   enterShell = ''

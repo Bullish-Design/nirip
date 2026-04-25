@@ -1,7 +1,7 @@
 [project]
-name = "template-py"
+name = "nirip"
 version = "0.1.0"
-description = "A Python project template with modern tooling."
+description = "NIRIP Python project."
 readme = "README.md"
 requires-python = ">=3.13"
 license = { text = "MIT" }
@@ -23,16 +23,16 @@ dev = [
 ]
 
 #[project.urls]
-#homepage = "https://github.com/Bullish-Design/template-py"
-#repository = "https://github.com/Bullish-Design/template-py.git"
+#homepage = "https://github.com/Bullish-Design/nirip"
+#repository = "https://github.com/Bullish-Design/nirip.git"
 
 [build-system]
 requires = ["hatchling>=1.18"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-# Tell hatch which package to ship (your code lives in src/template_py)
-packages = ["src/template_py"]
+# Tell hatch which package to ship (your code lives in src/nirip)
+packages = ["src/nirip"]
 
 [tool.hatch.build.targets.sdist]
 include = [
@@ -48,12 +48,12 @@ include = [
 # Keep the default behavior; this section is here so you can extend it later if needed.
 
 [tool.pytest.ini_options]
-addopts = "-q --cov=embeddify --cov-report=term-missing"
+addopts = "-q --cov=nirip --cov-report=term-missing"
 testpaths = ["tests"]
 
 [tool.mypy]
 python_version = "3.13"
-packages = ["src/template_py"]
+packages = ["src/nirip"]
 strict = true
 warn_unused_ignores = true
 warn_redundant_casts = true
@@ -82,4 +82,3 @@ ignore = []
 quote-style = "double"
 indent-style = "space"
 line-ending = "lf"
-
