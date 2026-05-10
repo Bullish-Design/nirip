@@ -32,7 +32,7 @@ A ground-up rethink of nirip as a Nim workspace orchestrator, designed alongside
 - Testing becomes compile-time type-checked fixtures rather than Pydantic model validation
 - The IPC client can be a shared Nim package used by both sidebard and nirip
 
-**Opportunity:** A `niri-ipc-nim` library package that both projects import. Typed request/response models, async socket client, event stream parser. Write once, use everywhere.
+**Opportunity:** A `nimri-ipc` library package that both projects import. Typed request/response models, async socket client, event stream parser. Write once, use everywhere.
 
 ---
 
@@ -53,7 +53,7 @@ A ground-up rethink of nirip as a Nim workspace orchestrator, designed alongside
 - Slight over-engineering if the IPC surface is small enough to duplicate
 
 **Implications:**
-- Package structure: `niri-ipc-nim/` as a nimble package, imported by both `sidebard` and `nirip`
+- Package structure: `nimri-ipc/` as a nimble package, imported by both `sidebard` and `nirip`
 - The library owns: socket connection, JSON serialization, typed request/response, event stream parsing
 - It does NOT own: state reduction, profile resolution, reconciliation logic
 
@@ -139,7 +139,7 @@ This keeps TOML files shallow and human-editable while supporting complex multi-
 - Pros: Clean binary boundary. Shared types and Niri client via nimble package. Can communicate via sidebard RPC when needed.
 - Cons: Need to manage the shared package dependency.
 
-**Recommendation:** Option C. Separate `nirip` binary. Shared `niri-ipc-nim` library. Communication via sidebard's JSON-RPC when enriched context is needed. This preserves the "nirip is the sculptor, sidebard is the brain" separation while eliminating duplicated Niri protocol code.
+**Recommendation:** Option C. Separate `nirip` binary. Shared `nimri-ipc` library. Communication via sidebard's JSON-RPC when enriched context is needed. This preserves the "nirip is the sculptor, sidebard is the brain" separation while eliminating duplicated Niri protocol code.
 
 ---
 
@@ -455,7 +455,7 @@ This separates "what action to take" from "what focus setup is needed" and makes
 - Need to handle "expected event never arrives" gracefully
 - Slightly more complex than "sleep 100ms, re-query Windows"
 
-**Opportunity:** If nirip and sidebard share a `niri-ipc-nim` library, the event stream parser is already written and tested. Nirip can use the same typed event model.
+**Opportunity:** If nirip and sidebard share a `nimri-ipc` library, the event stream parser is already written and tested. Nirip can use the same typed event model.
 
 ---
 
@@ -593,7 +593,7 @@ Running `nirip load` twice produces the same result. If windows already match, t
 │         │                 │                   │             │
 │         ▼                 ▼                   ▼             │
 │  ┌──────────────────────────────────────────────────────┐   │
-│  │              niri-ipc-nim (shared library)           │   │
+│  │              nimri-ipc (shared library)           │   │
 │  │                                                      │   │
 │  │  NiriClient  │  typed models  │  event stream        │   │
 │  └──────────────────────────────────────────────────────┘   │
@@ -663,7 +663,7 @@ src/
 ### Shared dependency
 
 ```
-niri-ipc-nim/                    # separate nimble package
+nimri-ipc/                    # separate nimble package
 ├── src/
 │   ├── niri_ipc.nim             # public API
 │   ├── client.nim               # async socket client
@@ -1319,7 +1319,7 @@ Match rules:
 
 ---
 
-## Niri IPC shared library (`niri-ipc-nim`)
+## Niri IPC shared library (`nimri-ipc`)
 
 ### Public API
 
@@ -1423,11 +1423,11 @@ This library is used by both sidebard (for its niri adapter) and nirip (for orch
 
 ## Implementation phases
 
-### Phase 1 — niri-ipc-nim library + snapshot
+### Phase 1 — nimri-ipc library + snapshot
 
 Build the shared library. Connect to Niri. Fetch windows/workspaces/outputs. Parse typed responses.
 
-**Ships:** `niri-ipc-nim` nimble package. A trivial `nirip snapshot --json` that dumps current state.
+**Ships:** `nimri-ipc` nimble package. A trivial `nirip snapshot --json` that dumps current state.
 
 **Proves:** The Niri socket protocol works in Nim. Typed models parse correctly. The library is usable.
 
@@ -1508,7 +1508,7 @@ Query sidebard for sidebar ownership (skip sidebar windows during matching). Exp
 | Matching | Score-based float accumulation | Boolean rule composition |
 | State persistence | SQLite database | Simple JSON file |
 | Plugin model | Protocol class + dynamic import | Compiled-in modules (later phases) |
-| Niri client | Custom async Python | Shared `niri-ipc-nim` library with sidebard |
+| Niri client | Custom async Python | Shared `nimri-ipc` library with sidebard |
 | Planner | Class with methods | Pure function |
 | Executor | Async reconciler class | Async loop with event confirmation |
 | Testing | Pytest + Pydantic fixtures | Nim unittest + typed fixtures |
@@ -1521,13 +1521,13 @@ Query sidebard for sidebar ownership (skip sidebar windows during matching). Exp
 ### Package
 
 ```nix
-{ lib, nimPackages, niri-ipc-nim }:
+{ lib, nimPackages, nimri-ipc }:
 
 nimPackages.buildNimPackage {
   pname = "nirip";
   version = "0.1.0";
   src = ./.;
-  propagatedNimDeps = [ niri-ipc-nim ];
+  propagatedNimDeps = [ nimri-ipc ];
 }
 ```
 
@@ -1573,7 +1573,7 @@ This means profiles declared in Nix are generated as TOML files at build time. N
 
 Summarized from the integration analysis:
 
-- **Shared:** `niri-ipc-nim` library (types, client, event stream)
+- **Shared:** `nimri-ipc` library (types, client, event stream)
 - **sidebard → nirip:** Commands invoke `nirip load/close` via shell or typed action
 - **nirip → sidebard:** Optional RPC query for sidebar ownership (skip those windows)
 - **Independent:** Each has its own event loop, state, and lifecycle
