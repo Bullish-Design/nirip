@@ -1,7 +1,7 @@
 import std/[options, tables]
 import types
 import matcher
-import nimri_ipc
+import nimri_ipc/nimri_ipc as nimri_ipc
 
 proc planWorkspaces*(profile: Profile, snapshot: NiriSnapshot): seq[Operation] =
   var existing: Table[string, bool]

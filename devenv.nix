@@ -1,57 +1,28 @@
 { pkgs, lib, config, inputs, ... }:
 
 {
-  # https://devenv.sh/basics/
   env.GREET = "nirip";
   env.PROJECT_DIR = "/home/andrew/Documents/Projects/nirip";
 
-  # https://devenv.sh/packages/
-  packages = [ 
-    pkgs.git 
-    pkgs.uv
-    ];
+  packages = [
+    pkgs.git
+    pkgs.nim
+    pkgs.nimble
+  ];
 
-  # https://devenv.sh/languages/
-  # languages.rust.enable = true;
-  languages = {
-      python = {
-          enable = true;
-          version = "3.13";
-          venv.enable = true;
-          uv.enable = true;
-        };
-    };
-
-  # https://devenv.sh/processes/
-  # processes.cargo-watch.exec = "cargo-watch";
-
-  # https://devenv.sh/services/
-  # services.postgres.enable = true;
-
-  # https://devenv.sh/scripts/
   scripts.hello.exec = ''
     echo "hello from $GREET at $PROJECT_DIR"
   '';
 
   enterShell = ''
     hello
-    git --version
+    nim --version
+    nimble --version
   '';
 
-  # https://devenv.sh/tasks/
-  # tasks = {
-  #   "myproj:setup".exec = "mytool build";
-  #   "devenv:enterShell".after = [ "myproj:setup" ];
-  # };
-
-  # https://devenv.sh/tests/
   enterTest = ''
     echo "Running tests"
-    git --version | grep --color=auto "${pkgs.git.version}"
+    nim --version
+    nimble --version
   '';
-
-  # https://devenv.sh/pre-commit-hooks/
-  # pre-commit.hooks.shellcheck.enable = true;
-
-  # See full reference at https://devenv.sh/reference/options/
 }

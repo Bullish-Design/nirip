@@ -1,6 +1,5 @@
-import std/[options, tables, times, hashes]
-import results
-import nimri_ipc
+import std/[options, tables, monotimes, hashes]
+import nimri_ipc/nimri_ipc as nimri_ipc
 
 type
   ProfileName* = distinct string
@@ -27,50 +26,39 @@ proc `$`*(a: OutputAlias): string {.borrow.}
 
 type
   SizeKind* = enum
-    skProportion
-    skPixels
+    skProportion, skPixels
 
   SizeSpec* = object
     case kind*: SizeKind
-    of skProportion:
-      ratio*: float
-    of skPixels:
-      px*: int
+    of skProportion: ratio*: float
+    of skPixels: px*: int
 
   ColumnDisplay* = enum
-    cdNormal
-    cdTabbed
+    cdNormal, cdTabbed
 
-type
+  MatchRuleKind* = enum
+    mrExactAppId, mrRegexAppId, mrExactTitle, mrRegexTitle, mrWorkspaceName,
+    mrPidFromSpawn, mrOpenedAfter, mrAll, mrAny, mrNot
+
+  MatchRule* = ref object
+    case kind*: MatchRuleKind
+    of mrExactAppId: appId*: string
+    of mrRegexAppId: appIdPattern*: string
+    of mrExactTitle: title*: string
+    of mrRegexTitle: titlePattern*: string
+    of mrWorkspaceName: workspace*: string
+    of mrPidFromSpawn: discard
+    of mrOpenedAfter: afterTs*: MonoTime
+    of mrAll: allRules*: seq[MatchRule]
+    of mrAny: anyRules*: seq[MatchRule]
+    of mrNot: negated*: MatchRule
+
   ProfileOptions* = object
-    matchExisting*: bool
-    launchMissing*: bool
-    moveUnmanaged*: bool
-    closeExtra*: bool
+    matchExisting*, launchMissing*, moveUnmanaged*, closeExtra*: bool
     timeoutMs*: int
     focusAfterLoad*: Option[string]
 
   OutputAliases* = Table[OutputAlias, seq[string]]
-
-  Profile* = object
-    name*: ProfileName
-    description*: string
-    options*: ProfileOptions
-    outputs*: OutputAliases
-    workspaces*: seq[WorkspaceSpec]
-
-  WorkspaceSpec* = object
-    name*: WorkspaceName
-    output*: Option[string]
-    index*: Option[int]
-    focus*: Option[WindowRole]
-    columns*: seq[ColumnSpec]
-
-  ColumnSpec* = object
-    id*: Option[ColumnRole]
-    width*: Option[SizeSpec]
-    display*: ColumnDisplay
-    windows*: seq[WindowSpec]
 
   WindowSpec* = object
     id*: WindowRole
@@ -81,41 +69,25 @@ type
     height*: Option[SizeSpec]
     floating*: bool
 
-type
-  MatchRuleKind* = enum
-    mrExactAppId
-    mrRegexAppId
-    mrExactTitle
-    mrRegexTitle
-    mrWorkspaceName
-    mrPidFromSpawn
-    mrOpenedAfter
-    mrAll
-    mrAny
-    mrNot
+  ColumnSpec* = object
+    id*: Option[ColumnRole]
+    width*: Option[SizeSpec]
+    display*: ColumnDisplay
+    windows*: seq[WindowSpec]
 
-  MatchRule* = ref object
-    case kind*: MatchRuleKind
-    of mrExactAppId:
-      appId*: string
-    of mrRegexAppId:
-      appIdPattern*: string
-    of mrExactTitle:
-      title*: string
-    of mrRegexTitle:
-      titlePattern*: string
-    of mrWorkspaceName:
-      workspace*: string
-    of mrPidFromSpawn:
-      discard
-    of mrOpenedAfter:
-      afterTs*: MonoTime
-    of mrAll:
-      allRules*: seq[MatchRule]
-    of mrAny:
-      anyRules*: seq[MatchRule]
-    of mrNot:
-      negated*: MatchRule
+  WorkspaceSpec* = object
+    name*: WorkspaceName
+    output*: Option[string]
+    index*: Option[int]
+    focus*: Option[WindowRole]
+    columns*: seq[ColumnSpec]
+
+  Profile* = object
+    name*: ProfileName
+    description*: string
+    options*: ProfileOptions
+    outputs*: OutputAliases
+    workspaces*: seq[WorkspaceSpec]
 
   MatchResult* = object
     matched*: bool
@@ -126,29 +98,15 @@ type
     launchedPids*: Table[WindowRole, int]
     workspaceNames*: Table[nimri_ipc.WorkspaceId, string]
 
-type
   OpKind* = enum
-    opEnsureWorkspace
-    opMoveWorkspaceToOutput
-    opMoveWorkspaceToIndex
-    opSpawnWindow
-    opWaitForWindow
-    opMatchExistingWindow
-    opMoveWindowToWorkspace
-    opMoveWindowToTiling
-    opMoveWindowToFloating
-    opConsumeIntoColumn
-    opMoveColumnToIndex
-    opSetColumnWidth
-    opSetWindowHeight
-    opSetColumnDisplay
-    opFocusWindow
-    opFocusWorkspace
+    opEnsureWorkspace, opMoveWorkspaceToOutput, opMoveWorkspaceToIndex,
+    opSpawnWindow, opWaitForWindow, opMatchExistingWindow, opMoveWindowToWorkspace,
+    opMoveWindowToTiling, opMoveWindowToFloating, opConsumeIntoColumn,
+    opMoveColumnToIndex, opSetColumnWidth, opSetWindowHeight, opSetColumnDisplay,
+    opFocusWindow, opFocusWorkspace
 
   FocusReq* = enum
-    frNone
-    frWindow
-    frColumn
+    frNone, frWindow, frColumn
 
   Operation* = object
     focusReq*: FocusReq
@@ -204,7 +162,6 @@ type
     of opFocusWorkspace:
       fwsName*: WorkspaceName
 
-type
   PlanResult* = object
     operations*: seq[Operation]
     matchedWindows*: Table[WindowRole, nimri_ipc.WindowId]
@@ -217,12 +174,8 @@ type
     outputs*: Table[string, nimri_ipc.Output]
     focusedWindowId*: Option[nimri_ipc.WindowId]
 
-type
   OpOutcome* = enum
-    ooCompleted
-    ooSkipped
-    ooFailed
-    ooTimeout
+    ooCompleted, ooSkipped, ooFailed, ooTimeout
 
   ExecutedOp* = object
     operation*: Operation
@@ -230,7 +183,4 @@ type
     message*: string
 
   ExecuteResult* = object
-    completed*: seq[ExecutedOp]
-    failed*: seq[ExecutedOp]
-    skipped*: seq[ExecutedOp]
-    timedOut*: seq[ExecutedOp]
+    completed*, failed*, skipped*, timedOut*: seq[ExecutedOp]

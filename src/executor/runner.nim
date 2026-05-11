@@ -1,7 +1,7 @@
 import std/[options, times]
 import results
 import chronos
-import nimri_ipc
+import nimri_ipc/nimri_ipc as nimri_ipc
 import ../core/[types, planner]
 import focus
 import launcher

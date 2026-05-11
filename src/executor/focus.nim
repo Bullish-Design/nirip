@@ -1,6 +1,6 @@
 import std/options
 import results
-import nimri_ipc
+import nimri_ipc/nimri_ipc as nimri_ipc
 import ../core/types
 
 proc ensureFocus*(client: NiriIpcClient, op: Operation): Result[void, string] =

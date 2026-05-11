@@ -1,7 +1,7 @@
 import std/[json, os, tables, options]
 import results
 import ../core/types
-import nimri_ipc
+import nimri_ipc/nimri_ipc as nimri_ipc
 
 type ManagedState* = object
   activeProfile*: Option[ProfileName]

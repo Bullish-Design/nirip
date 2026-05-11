@@ -1,6 +1,6 @@
 import std/[os, options, tables]
 import cligen
-import nimri_ipc
+import nimri_ipc/nimri_ipc as nimri_ipc
 import results
 import core/[types, config, planner, diagnostics, freezer]
 import executor/runner

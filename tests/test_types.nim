@@ -1,7 +1,7 @@
 import std/options
 import unittest
 import core/types
-import nimri_ipc
+import nimri_ipc/nimri_ipc as nimri_ipc
 
 suite "types":
   test "distinct IDs":

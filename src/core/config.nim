@@ -2,7 +2,7 @@ import std/[os, options, tables, strutils, sequtils, algorithm]
 import results
 import toml_serialization
 import types
-import nimri_ipc
+from nimri_ipc/models import Output
 
 type
   GlobalConfig* = object
@@ -60,7 +60,7 @@ type
     heightPx*: Option[int]
     floating*: Option[bool]
 
-  MatchConfig* = object
+  MatchConfig* = ref object
     appId*: Option[string]
     appIdRegex*: Option[string]
     title*: Option[string]
@@ -253,7 +253,7 @@ proc listProfiles*(configDir: string): seq[string] =
     else:
       discard
 
-proc resolveOutput*(alias: string, aliases: OutputAliases, availableOutputs: Table[string, nimri_ipc.Output]): Option[string] =
+proc resolveOutput*(alias: string, aliases: OutputAliases, availableOutputs: Table[string, Output]): Option[string] =
   if alias in availableOutputs: return some(alias)
   let aliasId = OutputAlias(alias)
   if aliasId in aliases:

@@ -1,6 +1,6 @@
 import std/[options, tables, sequtils]
 import types
-import nimri_ipc
+import nimri_ipc/nimri_ipc as nimri_ipc
 
 proc freezeWorkspace*(ws: nimri_ipc.Workspace, windows: seq[nimri_ipc.Window]): WorkspaceSpec =
   var col = ColumnSpec(id: none(ColumnRole), width: none(SizeSpec), display: cdNormal, windows: @[])

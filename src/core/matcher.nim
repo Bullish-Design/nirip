@@ -1,6 +1,6 @@
 import std/[options, tables, re]
 import types
-import nimri_ipc
+import nimri_ipc/nimri_ipc as nimri_ipc
 
 proc evaluate*(rule: MatchRule, window: nimri_ipc.Window, context: MatchContext): MatchResult =
   case rule.kind
