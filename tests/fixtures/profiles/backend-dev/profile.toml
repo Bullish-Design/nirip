@@ -1,0 +1,11 @@
+name = "backend-dev"
+description = "Backend development layout"
+
+[options]
+match_existing = true
+launch_missing = true
+timeout_ms = 15000
+focus_after_load = "code/editor"
+
+[outputs]
+primary = ["DP-1", "eDP-1"]
