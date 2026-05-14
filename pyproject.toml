@@ -12,6 +12,9 @@ authors = [
 
 dependencies = [
   "pydantic>=2.12.5",
+  "niri-pypc",
+  "niri-state",
+  "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]

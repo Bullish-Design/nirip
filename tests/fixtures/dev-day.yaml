@@ -1,0 +1,10 @@
+name: dev-day
+workspaces:
+  - name: code
+    output: DP-1
+    apps:
+      - name: editor
+        match:
+          app_id: dev-editor
+        spawn:
+          command: ["kitty", "--class", "dev-editor", "-e", "nvim"]
