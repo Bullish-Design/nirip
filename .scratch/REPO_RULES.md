@@ -14,10 +14,10 @@ These rules are in addition to universal rules.
 
 ## Coding Standards (repo-specific)
 
-- Keep `core/*` deterministic and side-effect free.
-- Keep `executor/*` responsible for process and IPC side effects.
+- Keep `src/nirip/spec`, `src/nirip/resolve`, and `src/nirip/planning` deterministic and side-effect free.
+- Keep `src/nirip/execution`, `src/nirip/facade`, and `src/nirip/cli` responsible for process/IPC/runtime side effects.
 - Prefer typed errors/results over string-only failures.
-- Preserve compatibility for profile schema changes; document any breaking change.
+- Preserve compatibility for session schema changes; document any breaking change.
 
 ---
 
@@ -26,23 +26,25 @@ These rules are in addition to universal rules.
 | Document | Path |
 |----------|------|
 | Agent/project boundaries | `AGENTS.md` |
-| Final architecture concept | `.scratch/projects/004-final-concept/FINAL_CONCEPT.md` |
-| Nirip implementation details | `.scratch/projects/004-final-concept/NIRIP_IMPLEMENTATION_GUIDE.md` |
+| Final architecture concept | `.scratch/projects/006-v3-revised-python-concept/NIRIP_CONCEPT_FINAL.md` |
+| Nirip implementation details | `.scratch/projects/006-v3-revised-python-concept/NIRIP_IMPLEMENTATION_GUIDE.md` |
 
 ---
 
 ## Architecture Overview
 
 `nirip` is a declarative Niri workspace orchestrator with:
-- Pure planning/matching/freezing in `core/*`.
-- Execution and event-confirmation in `executor/*`.
-- Optional persisted managed state in `state/*`.
-- Optional integration adapters in `integrations/*`.
+- Spec loading/validation in `src/nirip/spec/*`.
+- Pure normalization, matching, and planning in `src/nirip/resolve/*` + `src/nirip/planning/*`.
+- Execution and event-confirmation logic in `src/nirip/execution/*`.
+- Capture, public facade APIs, and CLI in `src/nirip/capture/*`, `src/nirip/facade/*`, and `src/nirip/cli/*`.
 
 ---
 
 ## Test Suite
 
-- Use `devenv shell -- nimble test` for suite runs.
+- Use `devenv shell -- python -m pytest tests/` for suite runs.
+- Use `devenv shell -- ruff check src/nirip tests` for linting.
+- Use `devenv shell -- ty check src/nirip` for type checks.
 - Prefer targeted module tests first, then full suite.
 - Live Niri-dependent tests must skip cleanly without `$NIRI_SOCKET`.

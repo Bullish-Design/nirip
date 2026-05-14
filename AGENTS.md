@@ -19,42 +19,39 @@ This repository builds `nirip`, a declarative workspace orchestrator for the Nir
 - Remote/cloud orchestration or external control planes.
 
 ## Architecture
-Expected layout under `src/nirip/`:
+Actual layout under `src/nirip/`:
 
 | Module | Role | I/O |
 |---|---|---|
 | `__main__.py` | Program entrypoint and subcommand dispatch | Yes |
-| `cli.py` | CLI argument parsing and command flow | Yes |
-| `core/types.py` | Domain identifiers and profile/operation types | No |
-| `core/config.py` | Profile schema load + validation | File I/O |
-| `core/matcher.py` | Window match rule evaluation | No |
-| `core/planner.py` | `plan(desired, actual) -> operations` | No |
-| `core/freezer.py` | Snapshot-to-profile conversion logic | No |
-| `core/diagnostics.py` | Human-readable diff/doctor output | No |
-| `executor/runner.py` | Operation execution + event-confirmation loop | Yes |
-| `executor/launcher.py` | Process launch + spawn tracking | Yes |
-| `state/managed.py` | Managed session state persistence | File I/O |
-| `integrations/sidebard_rpc.py` | Optional sidebard lookup adapter | Yes |
+| `cli/` | CLI argument parsing and command flow | Yes |
+| `spec/` | Session/workspace/app spec models and validation | No |
+| `resolve/` | Normalization and window matching | No |
+| `planning/` | Operation planning from desired vs actual state | No |
+| `execution/` | Async operation execution and event confirmation | Yes |
+| `capture/` | Snapshot-to-profile conversion (session freeze) | No |
+| `facade/` | Sync/async API orchestration | Yes |
+| `config.py` | Configuration model and file loading | File I/O |
 
 Key architectural decisions:
-- Planning logic remains pure and deterministic.
-- Executor side effects are explicit and confirmed by Niri events.
+- Planning logic (`spec/`, `resolve/`, `planning/`) remains pure and side-effect free.
+- Execution side effects are explicit and confirmed by Niri events.
 - Durable identity prefers profile/workspace names and match rules, not transient window IDs.
 - `nimri-ipc` stays the only Niri protocol boundary.
 
 ## Dependency Rules
 ```
-src/nirip/__main__.py -> cli, core/*, executor/*, state/*, integrations/*
-src/nirip/cli.py      -> core/types, core/config, core/planner, core/freezer, executor/runner
-src/nirip/core/planner.py -> core/types, core/matcher
-src/nirip/core/matcher.py -> core/types
-src/nirip/core/freezer.py -> core/types
-src/nirip/core/diagnostics.py -> core/types, core/planner
-src/nirip/executor/runner.py -> core/types, core/planner, state/managed (+ nimri-ipc)
-src/nirip/executor/launcher.py -> core/types
-src/nirip/state/managed.py -> core/types
-src/nirip/integrations/sidebard_rpc.py -> core/types
+src/nirip/__main__.py -> cli, spec, resolve, planning, execution, capture, facade, config
+src/nirip/cli/__init__.py -> spec, resolve, planning, execution, facade
+src/nirip/spec/ -> (self-contained, no external deps)
+src/nirip/resolve/ -> spec
+src/nirip/planning/ -> spec, resolve
+src/nirip/execution/ -> spec, planning (+ asyncio)
+src/nirip/capture/ -> spec, resolve
+src/nirip/facade/ -> spec, resolve, planning, execution, capture
 ```
+
+**Boundary discipline:** `spec/`, `resolve/`, `planning/`, `capture/` must not import `asyncio`, `subprocess`, `socket`, or perform I/O. All such side effects live in `execution/`, `facade/`, and `cli/`.
 
 ## Forbidden Couplings
 - Core modules must not perform process, socket, or filesystem side effects (except config/state persistence modules).
