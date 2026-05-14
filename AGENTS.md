@@ -21,17 +21,15 @@ This repository builds `nirip`, a declarative workspace orchestrator for the Nir
 ## Architecture
 Actual layout under `src/nirip/`:
 
-| Module | Role | I/O |
+| Module | Purpose | I/O? |
 |---|---|---|
-| `__main__.py` | Program entrypoint and subcommand dispatch | Yes |
-| `cli/` | CLI argument parsing and command flow | Yes |
-| `spec/` | Session/workspace/app spec models and validation | No |
-| `resolve/` | Normalization and window matching | No |
-| `planning/` | Operation planning from desired vs actual state | No |
-| `execution/` | Async operation execution and event confirmation | Yes |
-| `capture/` | Snapshot-to-profile conversion (session freeze) | No |
-| `facade/` | Sync/async API orchestration | Yes |
-| `config.py` | Configuration model and file loading | File I/O |
+| `spec/` | Session spec models, YAML loading, validation, defaults | No |
+| `resolve/` | Normalization, window matching, drift resolution | No |
+| `planning/` | Plan compilation, step ordering, diff generation | No |
+| `execution/` | Plan executor, action translation, predicates, runtime | Yes (async) |
+| `capture/` | Snapshot-to-spec scaffolding, name/rule inference | No |
+| `facade/` | AsyncNirip/SyncNirip orchestration facades | Yes (asyncio.run) |
+| `cli/` | Argparse, command dispatch, file I/O, stdout | Yes |
 
 Key architectural decisions:
 - Planning logic (`spec/`, `resolve/`, `planning/`) remains pure and side-effect free.
@@ -41,14 +39,9 @@ Key architectural decisions:
 
 ## Dependency Rules
 ```
-src/nirip/__main__.py -> cli, spec, resolve, planning, execution, capture, facade, config
-src/nirip/cli/__init__.py -> spec, resolve, planning, execution, facade
-src/nirip/spec/ -> (self-contained, no external deps)
-src/nirip/resolve/ -> spec
-src/nirip/planning/ -> spec, resolve
-src/nirip/execution/ -> spec, planning (+ asyncio)
-src/nirip/capture/ -> spec, resolve
-src/nirip/facade/ -> spec, resolve, planning, execution, capture
+spec -> resolve -> planning -> execution
+                           ↓
+capture <- facade -> cli
 ```
 
 **Boundary discipline:** `spec/`, `resolve/`, `planning/`, `capture/` must not import `asyncio`, `subprocess`, `socket`, or perform I/O. All such side effects live in `execution/`, `facade/`, and `cli/`.
