@@ -43,7 +43,11 @@ class AsyncNirip:
 
     async def apply(self, spec: SessionSpec) -> ApplyResult:
         plan = await self.plan(spec)
-        return await self._executor.execute(plan, snapshot=self._snapshot)
+        return await self._executor.execute(
+            plan,
+            snapshot=self._snapshot,
+            stop_on_error=spec.options.stop_on_error,
+        )
 
     async def capture(self, *, name: str | None = None) -> CapturedSession:
         return capture_from_snapshot(self._require_snapshot(), name=name)
