@@ -9,23 +9,23 @@ Place changes in the correct `nirip` layer and preserve separation between pure 
 - You need to prevent boundary/coupling regressions.
 
 ## Mental Model
-- Entrypoints: `src/nirip.nim`, `src/cli.nim`
-- Pure domain: `src/core/*.nim`
-- Execution side effects: `src/executor/*.nim`
-- Managed state persistence: `src/state/*.nim`
-- Integrations/adapters: `src/integrations/*.nim`
+- Entrypoints: `src/nirip/__main__.py`, `src/nirip/cli.py`
+- Pure domain: `src/nirip/core/*.py`
+- Execution side effects: `src/nirip/executor/*.py`
+- Managed state persistence: `src/nirip/state/*.py`
+- Integrations/adapters: `src/nirip/integrations/*.py`
 - Tests and fixtures: `tests/**`
 
 ## Workflow
 1. Start from the affected interface (CLI, profile config, planner output, executor action).
 2. Place behavior in pure `core/*` modules first when possible.
 3. Keep process/IPC/file side effects in executor/state/integration modules.
-4. Use `rg` to verify call sites and boundary consistency.
+4. Use `grep` or `rg` to verify call sites and boundary consistency.
 
 ## Handy Commands
-- `rg --files src tests`
-- `rg "proc\s+|type\s+|template\s+" src -n`
-- `rg "profile|match|plan|operation|execute|snapshot|workspace" src tests -n`
+- `grep --files src/nirip tests`
+- `grep -r "def |class " src/nirip -n`
+- `grep -r "profile\|match\|plan\|operation\|execute\|snapshot\|workspace" src/nirip tests -n`
 
 ## Done Criteria
 - Change is in the correct layer.

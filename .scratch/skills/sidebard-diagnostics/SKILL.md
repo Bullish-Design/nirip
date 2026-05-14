@@ -9,11 +9,11 @@ Keep nirip diagnostics actionable by preserving typed errors, clear operation co
 - Investigating profile parsing, match failures, or timeout behavior.
 
 ## Primary Targets
-- `src/core/diagnostics.nim`
-- `src/core/config.nim`
-- `src/core/planner.nim`
-- `src/executor/*.nim`
-- `src/cli.nim`
+- `src/nirip/core/diagnostics.py`
+- `src/nirip/core/config.py`
+- `src/nirip/core/planner.py`
+- `src/nirip/executor/*.py`
+- `src/nirip/cli.py`
 - `tests/**` (especially failure-path tests)
 
 ## Workflow

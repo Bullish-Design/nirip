@@ -19,22 +19,22 @@ This repository builds `nirip`, a declarative workspace orchestrator for the Nir
 - Remote/cloud orchestration or external control planes.
 
 ## Architecture
-Expected layout under `src/`:
+Expected layout under `src/nirip/`:
 
 | Module | Role | I/O |
 |---|---|---|
-| `nirip.nim` | Program entrypoint and subcommand dispatch | Yes |
-| `cli.nim` | CLI argument parsing and command flow | Yes |
-| `core/types.nim` | Domain identifiers and profile/operation types | No |
-| `core/config.nim` | Profile schema load + validation | File I/O |
-| `core/matcher.nim` | Window match rule evaluation | No |
-| `core/planner.nim` | `plan(desired, actual) -> operations` | No |
-| `core/freezer.nim` | Snapshot-to-profile conversion logic | No |
-| `core/diagnostics.nim` | Human-readable diff/doctor output | No |
-| `executor/runner.nim` | Operation execution + event-confirmation loop | Yes |
-| `executor/launcher.nim` | Process launch + spawn tracking | Yes |
-| `state/managed.nim` | Managed session state persistence | File I/O |
-| `integrations/sidebard_rpc.nim` | Optional sidebard lookup adapter | Yes |
+| `__main__.py` | Program entrypoint and subcommand dispatch | Yes |
+| `cli.py` | CLI argument parsing and command flow | Yes |
+| `core/types.py` | Domain identifiers and profile/operation types | No |
+| `core/config.py` | Profile schema load + validation | File I/O |
+| `core/matcher.py` | Window match rule evaluation | No |
+| `core/planner.py` | `plan(desired, actual) -> operations` | No |
+| `core/freezer.py` | Snapshot-to-profile conversion logic | No |
+| `core/diagnostics.py` | Human-readable diff/doctor output | No |
+| `executor/runner.py` | Operation execution + event-confirmation loop | Yes |
+| `executor/launcher.py` | Process launch + spawn tracking | Yes |
+| `state/managed.py` | Managed session state persistence | File I/O |
+| `integrations/sidebard_rpc.py` | Optional sidebard lookup adapter | Yes |
 
 Key architectural decisions:
 - Planning logic remains pure and deterministic.
@@ -44,16 +44,16 @@ Key architectural decisions:
 
 ## Dependency Rules
 ```
-nirip.nim            -> cli, core/*, executor/*, state/*, integrations/*
-cli.nim              -> core/types, core/config, core/planner, core/freezer, executor/runner
-core/planner.nim     -> core/types, core/matcher
-core/matcher.nim     -> core/types
-core/freezer.nim     -> core/types
-core/diagnostics.nim -> core/types, core/planner
-executor/runner.nim  -> core/types, core/planner, state/managed (+ nimri-ipc)
-executor/launcher.nim -> core/types
-state/managed.nim    -> core/types
-integrations/sidebard_rpc.nim -> core/types
+src/nirip/__main__.py -> cli, core/*, executor/*, state/*, integrations/*
+src/nirip/cli.py      -> core/types, core/config, core/planner, core/freezer, executor/runner
+src/nirip/core/planner.py -> core/types, core/matcher
+src/nirip/core/matcher.py -> core/types
+src/nirip/core/freezer.py -> core/types
+src/nirip/core/diagnostics.py -> core/types, core/planner
+src/nirip/executor/runner.py -> core/types, core/planner, state/managed (+ nimri-ipc)
+src/nirip/executor/launcher.py -> core/types
+src/nirip/state/managed.py -> core/types
+src/nirip/integrations/sidebard_rpc.py -> core/types
 ```
 
 ## Forbidden Couplings
@@ -63,24 +63,24 @@ integrations/sidebard_rpc.nim -> core/types
 - Niri transport/protocol handling must not leak outside `nimri-ipc` integration points.
 
 ## Development Environment
-All compilation, testing, and tooling should run inside `devenv` for reproducible Nim/Nimble versions.
+All development should run inside `devenv` for reproducible Python versions.
 
 ### Common commands
 ```bash
-devenv shell -- nimble build
-devenv shell -- nimble test
-devenv shell -- nim c -r tests/test_planner.nim
+devenv shell -- ruff check src/nirip/
+devenv shell -- ty check src/nirip/
+devenv shell -- python -m pytest tests/
 ```
 
 ### Agent rule
-When compiling or testing, run through `devenv shell -- <command>` unless already inside a devenv shell.
+When linting, type checking, or testing, run through `devenv shell -- <command>` unless already inside a devenv shell.
 
 ## Technology Stack
-- Nim >= 2.0
-- Nimble for package/build workflow
-- `results` for typed error returns
+- Python >= 3.11
+- `ruff` for linting
+- `ty` for static type checking
 - `nimri-ipc` for typed Niri IPC request/event handling
-- Stdlib async/process/options/tables/json utilities as needed
+- Stdlib pathlib/json/argparse/subprocess utilities as needed
 
 ## Design Principles
 1. Deterministic planning and reconciliation from explicit inputs.
@@ -100,4 +100,5 @@ When compiling or testing, run through `devenv shell -- <command>` unless alread
 2. Implement changes in the narrowest valid module.
 3. Add/update tests nearest to changed behavior.
 4. Run targeted tests, then broader suite as needed.
-5. Report what was validated and any residual risk.
+5. Run `ruff check` and `ty check` to ensure code quality.
+6. Report what was validated and any residual risk.
