@@ -20,7 +20,13 @@ class PlanExecutor:
     def __init__(self, client: ActionClient | None = None) -> None:
         self.client = client
 
-    async def execute(self, plan: Plan, snapshot: Any | None = None) -> ApplyResult:
+    async def execute(
+        self,
+        plan: Plan,
+        snapshot: Any | None = None,
+        *,
+        stop_on_error: bool = False,
+    ) -> ApplyResult:
         """Execute all steps in order and return outcomes."""
 
         start = time.monotonic()
@@ -29,7 +35,7 @@ class PlanExecutor:
         for step in plan.steps:
             step_start = time.monotonic()
             predicate = predicate_for_step(step)
-            if snapshot is not None and predicate(snapshot):
+            if predicate is not None and snapshot is not None and predicate(snapshot):
                 results.append(
                     StepResult(
                         step=step,
@@ -53,6 +59,8 @@ class PlanExecutor:
                             duration_s=time.monotonic() - step_start,
                         )
                     )
+                    if stop_on_error:
+                        break
                     continue
 
             results.append(
