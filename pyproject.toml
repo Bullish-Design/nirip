@@ -1,6 +1,6 @@
 [project]
 name = "nirip"
-version = "0.1.0"
+version = "0.1.1"
 description = "NIRIP Python project."
 readme = "README.md"
 requires-python = ">=3.13"
@@ -12,8 +12,8 @@ authors = [
 
 dependencies = [
   "pydantic>=2.12.5",
-  "niri-pypc",
-  "niri-state",
+  "niri-pypc>=0.4.0",
+  "niri-state>=0.2.1",
   "pyyaml>=6.0",
 ]
 
@@ -21,13 +21,13 @@ dependencies = [
 dev = [
   "pytest>=7.0",
   "pytest-cov>=4.1",
-  "mypy>=1.10",
+  "ty",
   "ruff>=0.5.0",
 ]
 
 [tool.uv.sources]
-niri-pypc = { git = "https://github.com/Bullish-Design/niri-pypc.git", tag = "v0.3.1" }
-niri-state = { git = "https://github.com/Bullish-Design/niri-state.git", tag = "v0.2.0" }
+niri-pypc = { git = "https://github.com/Bullish-Design/niri-pypc.git", tag = "v0.4.0" }
+niri-state = { git = "https://github.com/Bullish-Design/niri-state.git", tag = "v0.2.1" }
 
 
 #[project.urls]
@@ -59,17 +59,11 @@ include = [
 addopts = "-q --cov=nirip --cov-report=term-missing"
 testpaths = ["tests"]
 
-[tool.mypy]
-python_version = "3.13"
-packages = ["src/nirip"]
-strict = true
-warn_unused_ignores = true
-warn_redundant_casts = true
-warn_unused_configs = true
-disallow_untyped_defs = true
-disallow_incomplete_defs = true
-disallow_untyped_calls = true
-no_implicit_optional = true
+[tool.ty]
+src = ["src"]
+
+[tool.ty.environment]
+python-version = "3.13"
 
 [tool.ruff]
 line-length = 120
