@@ -84,6 +84,22 @@ def resolve(normalized: NormalizedSession, snapshot: SnapshotLike) -> Resolution
                             desired=str(app.placement.floating),
                         )
                     )
+                if window is not None and window.is_fullscreen != app.placement.fullscreen:
+                    drift.append(
+                        DriftItem(
+                            kind=DriftKind.WRONG_FULLSCREEN,
+                            current=str(window.is_fullscreen),
+                            desired=str(app.placement.fullscreen),
+                        )
+                    )
+                if window is not None and window.is_maximized != app.placement.maximized:
+                    drift.append(
+                        DriftItem(
+                            kind=DriftKind.WRONG_MAXIMIZED,
+                            current=str(window.is_maximized),
+                            desired=str(app.placement.maximized),
+                        )
+                    )
 
                 if drift:
                     status = ResolutionStatus.DRIFTED

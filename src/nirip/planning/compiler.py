@@ -93,6 +93,38 @@ def compile_plan(resolution: Resolution) -> Plan:
                                 description=f"Set floating for '{app.app_name}' to {drift.desired}",
                             )
                         )
+                    if drift.kind == DriftKind.WRONG_FULLSCREEN:
+                        kind = (
+                            StepKind.SET_FULLSCREEN
+                            if drift.desired == "True"
+                            else StepKind.UNSET_FULLSCREEN
+                        )
+                        steps.append(
+                            PlanStep(
+                                id=new_id("fs"),
+                                kind=kind,
+                                app_name=app.app_name,
+                                workspace_name=app.workspace_name,
+                                window_id=app.match_decision.best,
+                                description=f"Set fullscreen for '{app.app_name}' to {drift.desired}",
+                            )
+                        )
+                    if drift.kind == DriftKind.WRONG_MAXIMIZED:
+                        kind = (
+                            StepKind.SET_MAXIMIZED
+                            if drift.desired == "True"
+                            else StepKind.UNSET_MAXIMIZED
+                        )
+                        steps.append(
+                            PlanStep(
+                                id=new_id("max"),
+                                kind=kind,
+                                app_name=app.app_name,
+                                workspace_name=app.workspace_name,
+                                window_id=app.match_decision.best,
+                                description=f"Set maximized for '{app.app_name}' to {drift.desired}",
+                            )
+                        )
 
     return Plan(
         session_name=resolution.session_name,

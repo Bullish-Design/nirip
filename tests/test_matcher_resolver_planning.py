@@ -15,6 +15,8 @@ class Win:
     pid: int | None
     workspace_id: int | None
     is_floating: bool = False
+    is_fullscreen: bool = False
+    is_maximized: bool = False
 
 
 @dataclass

@@ -17,6 +17,10 @@ class StepKind(StrEnum):
     MOVE_WINDOW_TO_WORKSPACE = "move_window_to_workspace"
     SET_FLOATING = "set_floating"
     SET_TILING = "set_tiling"
+    SET_FULLSCREEN = "set_fullscreen"
+    UNSET_FULLSCREEN = "unset_fullscreen"
+    SET_MAXIMIZED = "set_maximized"
+    UNSET_MAXIMIZED = "unset_maximized"
     FOCUS_WINDOW = "focus_window"
     FOCUS_WORKSPACE = "focus_workspace"
 

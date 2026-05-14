@@ -29,6 +29,12 @@ class WindowLike(Protocol):
     @property
     def is_floating(self) -> bool: ...
 
+    @property
+    def is_fullscreen(self) -> bool: ...
+
+    @property
+    def is_maximized(self) -> bool: ...
+
 
 def evaluate_rule(rule: MatchRule, window: WindowLike) -> tuple[bool, float, list[str]]:
     """Evaluate a MatchRule against a single window."""
