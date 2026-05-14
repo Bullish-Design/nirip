@@ -54,10 +54,15 @@ src/nirip/facade/ -> spec, resolve, planning, execution, capture
 **Boundary discipline:** `spec/`, `resolve/`, `planning/`, `capture/` must not import `asyncio`, `subprocess`, `socket`, or perform I/O. All such side effects live in `execution/`, `facade/`, and `cli/`.
 
 ## Forbidden Couplings
-- Core modules must not perform process, socket, or filesystem side effects (except config/state persistence modules).
+- Core modules (`spec/`, `resolve/`, `planning/`, `capture/`) must not perform process, socket, or filesystem side effects (except config/state persistence modules).
 - Executor modules must not redefine policy that belongs in planner/matcher.
 - CLI must not bypass typed plan/execution contracts.
 - Niri transport/protocol handling must not leak outside `nimri-ipc` integration points.
+
+## Implementation Notes
+- Predicates in `execution/predicates.py` must verify specific window appearance, not just presence of any window.
+- The executor must check predicates *after* spawning, not before (to avoid skipping steps already "satisfied" by pre-existing state).
+- `SessionOptions` fields (`stop_on_error`, `mode`, `match_existing`, `launch_missing`, `move_unmatched`) must be wired and enforced or removed as dead code.
 
 ## Development Environment
 All development should run inside `devenv` for reproducible Python versions.

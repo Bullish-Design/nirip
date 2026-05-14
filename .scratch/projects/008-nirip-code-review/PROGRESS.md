@@ -13,3 +13,4 @@
 - All source and test files reviewed in full
 - Tests pass, linter clean
 - Report written to REVIEW_REPORT.md
+- Updated AGENTS.md architecture table to match actual layout
