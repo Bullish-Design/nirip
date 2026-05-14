@@ -12,7 +12,7 @@ def apply_defaults(spec: SessionSpec) -> SessionSpec:
     for ws in spec.workspaces:
         apps = []
         for app in ws.apps:
-            if app.startup_timeout_s == 20.0 and default_timeout != 20.0:
+            if app.startup_timeout_s is None:
                 app = app.model_copy(update={"startup_timeout_s": default_timeout})
             apps.append(app)
         workspaces.append(ws.model_copy(update={"apps": apps}))

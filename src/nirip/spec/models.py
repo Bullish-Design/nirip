@@ -70,7 +70,7 @@ class AppSpec(BaseModel):
     spawn: SpawnSpec | None = None
     placement: PlacementSpec = Field(default_factory=PlacementSpec)
     optional: bool = False
-    startup_timeout_s: float = 20.0
+    startup_timeout_s: float | None = None
     depends_on: list[str] = Field(default_factory=list)
 
 
