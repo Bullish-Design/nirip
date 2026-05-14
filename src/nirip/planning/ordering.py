@@ -3,11 +3,15 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 
+from nirip.errors import CycleError
 from nirip.planning.models import PlanStep
 
 
 def topological_sort(steps: list[PlanStep]) -> list[PlanStep]:
-    """Sort steps according to step dependency IDs."""
+    """Sort steps according to step dependency IDs.
+
+    Raises CycleError if a dependency cycle is detected.
+    """
 
     id_map = {step.id: step for step in steps}
     indegree = {step.id: 0 for step in steps}
@@ -32,5 +36,7 @@ def topological_sort(steps: list[PlanStep]) -> list[PlanStep]:
                 queue.append(nxt)
 
     if len(ordered) != len(steps):
-        return steps
+        ordered_ids = {step.id for step in ordered}
+        cycle_ids = [step.id for step in steps if step.id not in ordered_ids]
+        raise CycleError(f"Dependency cycle detected among steps: {cycle_ids}")
     return ordered

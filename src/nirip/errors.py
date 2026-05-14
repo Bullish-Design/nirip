@@ -25,6 +25,10 @@ class PlanningError(NiripError):
     """Plan generation failed (unresolvable conflicts)."""
 
 
+class CycleError(PlanningError):
+    """Dependency cycle detected among plan steps."""
+
+
 class ExecutionError(NiripError):
     """Step execution failed."""
 
