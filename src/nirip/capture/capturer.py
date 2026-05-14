@@ -4,6 +4,7 @@ from __future__ import annotations
 from pydantic import BaseModel, computed_field
 
 from nirip.capture.inference import infer_app_name, infer_match_rule
+from nirip.resolve.resolver import SnapshotLike
 from nirip.spec.models import AppSpec, SessionSpec, WorkspaceSpec
 
 
@@ -24,15 +25,12 @@ class CapturedSession(BaseModel):
         return len(self.spec.workspaces)
 
 
-def capture_from_snapshot(snapshot: object, *, name: str | None = None) -> CapturedSession:
+def capture_from_snapshot(snapshot: SnapshotLike, *, name: str | None = None) -> CapturedSession:
     """Capture current snapshot into a scaffold spec."""
 
-    workspaces = getattr(snapshot, "workspaces", {})
-    windows = getattr(snapshot, "windows", {})
-
-    apps_by_ws: dict[int, list[AppSpec]] = {wid: [] for wid in workspaces.keys()}
-    for window in windows.values():
-        ws_id = getattr(window, "workspace_id", None)
+    apps_by_ws: dict[int, list[AppSpec]] = {wid: [] for wid in snapshot.workspaces.keys()}
+    for window in snapshot.windows.values():
+        ws_id = window.workspace_id
         if ws_id in apps_by_ws:
             apps_by_ws[ws_id].append(
                 AppSpec(
@@ -42,14 +40,14 @@ def capture_from_snapshot(snapshot: object, *, name: str | None = None) -> Captu
             )
 
     ws_specs: list[WorkspaceSpec] = []
-    for ws_id, workspace in workspaces.items():
-        ws_name = getattr(workspace, "name", None)
+    for ws_id, workspace in snapshot.workspaces.items():
+        ws_name = workspace.name
         if ws_name is None:
             continue
         ws_specs.append(
             WorkspaceSpec(
                 name=ws_name,
-                output=getattr(workspace, "output", None),
+                output=workspace.output,
                 apps=apps_by_ws.get(ws_id, []),
             )
         )
