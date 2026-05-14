@@ -22,6 +22,11 @@ dev = [
   "ruff>=0.5.0",
 ]
 
+[tool.uv.sources]
+niri-pypc = { git = "https://github.com/Bullish-Design/niri-pypc.git", tag = "v0.3.1" }
+niri-state = { git = "https://github.com/Bullish-Design/niri-state.git", tag = "v0.2.0" }
+
+
 #[project.urls]
 #homepage = "https://github.com/Bullish-Design/nirip"
 #repository = "https://github.com/Bullish-Design/nirip.git"
