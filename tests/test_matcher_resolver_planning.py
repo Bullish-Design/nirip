@@ -1,35 +1,9 @@
-from dataclasses import dataclass
-
 from nirip.planning.compiler import compile_diff, compile_plan
 from nirip.resolve.matcher import evaluate_rule, match_app
 from nirip.resolve.normalizer import normalize
 from nirip.resolve.resolver import resolve
 from nirip.spec.models import AppSpec, MatchRule, SessionSpec, WorkspaceSpec
-
-
-@dataclass
-class Win:
-    id: int
-    app_id: str | None
-    title: str | None
-    pid: int | None
-    workspace_id: int | None
-    is_floating: bool = False
-    is_fullscreen: bool = False
-    is_maximized: bool = False
-
-
-@dataclass
-class Ws:
-    id: int
-    name: str | None
-    output: str | None
-
-
-@dataclass
-class Snap:
-    windows: dict[int, Win]
-    workspaces: dict[int, Ws]
+from tests.conftest import Snap, Win, Ws
 
 
 def test_evaluate_rule() -> None:

@@ -1,5 +1,4 @@
 import asyncio
-from dataclasses import dataclass, field
 from typing import Any
 
 from nirip.execution.actions import StepAction
@@ -7,31 +6,7 @@ from nirip.execution.executor import PlanExecutor
 from nirip.execution.models import StepOutcome
 from nirip.planning.models import Plan, PlanStep, StepKind
 from nirip.resolve.models import Resolution
-
-
-@dataclass
-class MockWin:
-    id: int
-    app_id: str | None = None
-    title: str | None = None
-    pid: int | None = None
-    workspace_id: int | None = None
-    is_floating: bool = False
-    is_fullscreen: bool = False
-    is_maximized: bool = False
-
-
-@dataclass
-class MockWs:
-    id: int
-    name: str | None = None
-    output: str | None = None
-
-
-@dataclass
-class MockSnap:
-    windows: dict[int, MockWin] = field(default_factory=dict)
-    workspaces: dict[int, MockWs] = field(default_factory=dict)
+from tests.conftest import Snap, Win, Ws
 
 
 class MockClient:
@@ -72,28 +47,28 @@ class TestExecutor:
         assert result.steps == []
 
     def test_spawn_not_skipped_with_existing_windows(self) -> None:
-        snap = MockSnap(windows={1: MockWin(1, "firefox")}, workspaces={1: MockWs(1, "code")})
+        snap = Snap(windows={1: Win(1, "firefox")}, workspaces={1: Ws(1, "code")})
         step = _step("s1", StepKind.SPAWN_WINDOW, app_name="editor")
         executor = PlanExecutor()
         result = asyncio.run(executor.execute(_plan(step), snapshot=snap))
         assert result.steps[0].outcome == StepOutcome.COMPLETED
 
     def test_wait_for_window_not_skipped(self) -> None:
-        snap = MockSnap(windows={1: MockWin(1, "firefox")}, workspaces={1: MockWs(1, "ws")})
+        snap = Snap(windows={1: Win(1, "firefox")}, workspaces={1: Ws(1, "ws")})
         step = _step("w1", StepKind.WAIT_FOR_WINDOW, app_name="editor")
         executor = PlanExecutor()
         result = asyncio.run(executor.execute(_plan(step), snapshot=snap))
         assert result.steps[0].outcome == StepOutcome.COMPLETED
 
     def test_ensure_workspace_skipped_when_exists(self) -> None:
-        snap = MockSnap(workspaces={1: MockWs(1, "code")})
+        snap = Snap(workspaces={1: Ws(1, "code")})
         step = _step("ws1", StepKind.ENSURE_WORKSPACE, workspace_name="code")
         executor = PlanExecutor()
         result = asyncio.run(executor.execute(_plan(step), snapshot=snap))
         assert result.steps[0].outcome == StepOutcome.SKIPPED
 
     def test_ensure_workspace_not_skipped_when_missing(self) -> None:
-        snap = MockSnap(workspaces={1: MockWs(1, "other")})
+        snap = Snap(workspaces={1: Ws(1, "other")})
         step = _step("ws1", StepKind.ENSURE_WORKSPACE, workspace_name="code")
         executor = PlanExecutor()
         result = asyncio.run(executor.execute(_plan(step), snapshot=snap))
