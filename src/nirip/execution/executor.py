@@ -4,14 +4,14 @@ from __future__ import annotations
 import time
 from typing import Any, Protocol
 
-from nirip.execution.actions import action_for_step
+from nirip.execution.actions import StepAction, action_for_step
 from nirip.execution.models import ApplyResult, StepOutcome, StepResult
 from nirip.execution.predicates import predicate_for_step
 from nirip.planning.models import Plan
 
 
 class ActionClient(Protocol):
-    async def request(self, payload: dict[str, Any]) -> Any: ...
+    async def request(self, payload: StepAction) -> Any: ...
 
 
 class PlanExecutor:

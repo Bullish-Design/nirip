@@ -2,6 +2,7 @@ import asyncio
 from dataclasses import dataclass, field
 from typing import Any
 
+from nirip.execution.actions import StepAction
 from nirip.execution.executor import PlanExecutor
 from nirip.execution.models import StepOutcome
 from nirip.planning.models import Plan, PlanStep, StepKind
@@ -35,13 +36,13 @@ class MockSnap:
 
 class MockClient:
     def __init__(self, *, fail_on: set[str] | None = None) -> None:
-        self.requests: list[dict[str, Any]] = []
+        self.requests: list[StepAction] = []
         self.fail_on = fail_on or set()
 
-    async def request(self, payload: dict[str, Any]) -> Any:
+    async def request(self, payload: StepAction) -> Any:
         self.requests.append(payload)
-        if payload.get("kind") in self.fail_on:
-            raise RuntimeError(f"simulated failure: {payload['kind']}")
+        if payload.kind in self.fail_on:
+            raise RuntimeError(f"simulated failure: {payload.kind}")
         return {"ok": True}
 
 
