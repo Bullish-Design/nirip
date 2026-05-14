@@ -1,4 +1,5 @@
 import pytest
+from pydantic import ValidationError
 
 from nirip.config import NiripConfig
 
@@ -11,7 +12,7 @@ def test_default_config() -> None:
 
 def test_config_is_frozen() -> None:
     cfg = NiripConfig()
-    with pytest.raises(Exception):  # noqa: B017
+    with pytest.raises(ValidationError):
         cfg.default_timeout_s = 99.0
 
 
