@@ -1,16 +1,18 @@
-"""Capture live desktop into a scaffold SessionSpec."""
+"""Capture current state as a session scaffold."""
+
 from __future__ import annotations
 
-from pydantic import BaseModel, computed_field
+from pydantic import computed_field
 
+from niri_state import Snapshot
+from niri_state.api.selectors import windows, workspaces
+
+from nirip._base import NiripModel
 from nirip.capture.inference import infer_app_name, infer_match_rule
-from nirip.resolve.resolver import SnapshotLike
 from nirip.spec.models import AppSpec, SessionSpec, WorkspaceSpec
 
 
-class CapturedSession(BaseModel):
-    """Result of a capture operation."""
-
+class CapturedSession(NiripModel):
     spec: SessionSpec
     notes: list[str]
 
@@ -25,33 +27,20 @@ class CapturedSession(BaseModel):
         return len(self.spec.workspaces)
 
 
-def capture_from_snapshot(snapshot: SnapshotLike, *, name: str | None = None) -> CapturedSession:
-    """Capture current snapshot into a scaffold spec."""
+def capture_from_snapshot(snapshot: Snapshot, *, name: str | None = None) -> CapturedSession:
+    workspace_specs = []
+    notes = []
 
-    apps_by_ws: dict[int, list[AppSpec]] = {wid: [] for wid in snapshot.workspaces.keys()}
-    for window in snapshot.windows.values():
-        ws_id = window.workspace_id
-        if ws_id in apps_by_ws:
-            apps_by_ws[ws_id].append(
-                AppSpec(
-                    name=infer_app_name(window),
-                    match=infer_match_rule(window),
-                )
-            )
-
-    ws_specs: list[WorkspaceSpec] = []
-    for ws_id, workspace in snapshot.workspaces.items():
-        ws_name = workspace.name
-        if ws_name is None:
+    for ws in workspaces.list_workspaces(snapshot):
+        if ws.name is None:
+            notes.append(f"skipped unnamed workspace (id={ws.id})")
             continue
-        ws_specs.append(
-            WorkspaceSpec(
-                name=ws_name,
-                output=workspace.output,
-                apps=apps_by_ws.get(ws_id, []),
-            )
-        )
+        apps = []
+        for w in windows.list_windows_on_workspace(snapshot, ws.id):
+            apps.append(AppSpec(name=infer_app_name(w), match=infer_match_rule(w)))
+        workspace_specs.append(WorkspaceSpec(name=ws.name, output=ws.output, apps=apps))
 
-    spec = SessionSpec(name=name or "captured", workspaces=ws_specs)
-    notes = ["Captured scaffold uses conservative app_id matching; add spawn commands manually."]
-    return CapturedSession(spec=spec, notes=notes)
+    notes.append("Add spawn commands for apps you want auto-launched")
+    notes.append("Refine match rules for more reliable matching")
+
+    return CapturedSession(spec=SessionSpec(name=name or "captured", workspaces=workspace_specs), notes=notes)
