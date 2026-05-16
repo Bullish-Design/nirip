@@ -1,4 +1,6 @@
-"""Nirip error hierarchy."""
+"""Error hierarchy for nirip."""
+
+from __future__ import annotations
 
 
 class NiripError(Exception):
@@ -6,39 +8,35 @@ class NiripError(Exception):
 
 
 class SpecError(NiripError):
-    """Invalid session spec (parse error, validation failure)."""
+    """Invalid session spec (parse or structural error)."""
 
 
 class SpecValidationError(SpecError):
-    """Spec validation failed (empty match rules, conflicts, etc.)."""
+    """Spec validation failed with one or more errors."""
 
-
-class MatchError(NiripError):
-    """Window matching failure."""
-
-
-class AmbiguousMatchError(MatchError):
-    """Multiple windows match with similar confidence."""
+    def __init__(self, errors: list[str], warnings: list[str] | None = None) -> None:
+        self.errors = errors
+        self.warnings = warnings or []
+        msg = f"{len(errors)} validation error(s): {'; '.join(errors[:3])}"
+        if len(errors) > 3:
+            msg += f" ... and {len(errors) - 3} more"
+        super().__init__(msg)
 
 
 class PlanningError(NiripError):
-    """Plan generation failed (unresolvable conflicts)."""
+    """Plan compilation failed."""
 
 
 class CycleError(PlanningError):
-    """Dependency cycle detected among plan steps."""
+    """Dependency cycle detected during topological sort."""
 
-
-class ExecutionError(NiripError):
-    """Step execution failed."""
-
-
-class StepTimeoutError(ExecutionError):
-    """Window didn't appear within timeout."""
+    def __init__(self, cycle: list[str]) -> None:
+        self.cycle = cycle
+        super().__init__(f"dependency cycle: {' -> '.join(cycle)}")
 
 
 class CaptureError(NiripError):
-    """Capture failed."""
+    """Capture operation failed."""
 
 
 class NiripConnectionError(NiripError):
