@@ -1,184 +1,150 @@
-"""Aggressive session spec validation."""
+"""Session spec validation."""
+
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
 
-from nirip.spec.models import AppSpec, MatchRule, SessionSpec
+from pydantic import Field
+
+from nirip._base import NiripModel
+from nirip.spec.models import MatchRule, SessionSpec
 
 
-@dataclass(slots=True)
-class ValidationResult:
-    """Validation output."""
+class ValidationResult(NiripModel):
+    valid: bool = True
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
-    errors: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
 
-    @property
-    def valid(self) -> bool:
-        return len(self.errors) == 0
+class ValidatedSpec(NiripModel):
+    """A spec that passed parsing, bundled with its validation report."""
+
+    spec: SessionSpec
+    validation: ValidationResult
 
 
 def validate_session(spec: SessionSpec) -> ValidationResult:
-    """Run all validation checks on a session spec."""
+    """Run all validation checks. Never raises - all problems in result."""
+    errors: list[str] = []
+    warnings: list[str] = []
 
-    result = ValidationResult()
-    _check_unique_workspace_names(spec, result)
-    _check_unique_app_names(spec, result)
-    _check_depends_on_refs(spec, result)
-    _check_regex_patterns(spec, result)
-    _check_weak_matchers(spec, result)
-    _check_inter_app_conflicts(spec, result)
-    _check_spawn_commands(spec, result)
-    return result
+    _check_unique_workspace_names(spec, errors)
+    _check_unique_app_names(spec, errors)
+    _check_depends_on_refs(spec, errors)
+    _check_regex_patterns(spec, errors)
+    _check_weak_matchers(spec, warnings)
+    _check_inter_app_conflicts(spec, warnings)
+    _check_spawn_commands(spec, errors)
+
+    return ValidationResult(valid=len(errors) == 0, errors=errors, warnings=warnings)
 
 
-def _check_unique_workspace_names(spec: SessionSpec, result: ValidationResult) -> None:
+def _check_unique_workspace_names(spec: SessionSpec, errors: list[str]) -> None:
     seen: set[str] = set()
     for ws in spec.workspaces:
         if ws.name in seen:
-            result.errors.append(f"Duplicate workspace name: {ws.name}")
+            errors.append(f"duplicate workspace name: {ws.name}")
         seen.add(ws.name)
 
 
-def _check_unique_app_names(spec: SessionSpec, result: ValidationResult) -> None:
+def _check_unique_app_names(spec: SessionSpec, errors: list[str]) -> None:
     for ws in spec.workspaces:
         seen: set[str] = set()
         for app in ws.apps:
             if app.name in seen:
-                result.errors.append(f"Duplicate app name '{app.name}' in workspace '{ws.name}'")
+                errors.append(f"duplicate app name in workspace {ws.name}: {app.name}")
             seen.add(app.name)
 
 
-def _dfs_cycle(
-    name: str,
-    *,
-    app_map: dict[str, AppSpec],
-    temporary: set[str],
-    permanent: set[str],
-    workspace_name: str,
-    result: ValidationResult,
-) -> None:
-    if name in permanent:
-        return
-    if name in temporary:
-        result.errors.append(f"Dependency cycle detected in workspace '{workspace_name}' at '{name}'")
-        return
-
-    temporary.add(name)
-    app = app_map.get(name)
-    if app is not None:
-        for dep in app.depends_on:
-            _dfs_cycle(
-                dep,
-                app_map=app_map,
-                temporary=temporary,
-                permanent=permanent,
-                workspace_name=workspace_name,
-                result=result,
-            )
-    temporary.remove(name)
-    permanent.add(name)
-
-
-def _check_depends_on_refs(spec: SessionSpec, result: ValidationResult) -> None:
+def _check_depends_on_refs(spec: SessionSpec, errors: list[str]) -> None:
+    ws_apps: dict[str, set[str]] = {ws.name: {a.name for a in ws.apps} for ws in spec.workspaces}
     for ws in spec.workspaces:
-        app_map = {app.name: app for app in ws.apps}
         for app in ws.apps:
             for dep in app.depends_on:
-                if dep not in app_map:
-                    result.errors.append(
-                        f"depends_on reference '{dep}' missing for app '{app.name}' in workspace '{ws.name}'"
-                    )
+                if dep not in ws_apps[ws.name]:
+                    errors.append(f"app {ws.name}/{app.name} depends on unknown app {dep}")
 
-        temporary: set[str] = set()
-        permanent: set[str] = set()
-        for app in ws.apps:
-            _dfs_cycle(
-                app.name,
-                app_map=app_map,
-                temporary=temporary,
-                permanent=permanent,
-                workspace_name=ws.name,
-                result=result,
-            )
-
-
-def _rules(rule: MatchRule) -> list[MatchRule]:
-    nested: list[MatchRule] = [rule]
-    if rule.any_of:
-        for sub in rule.any_of:
-            nested.extend(_rules(sub))
-    if rule.not_rule:
-        nested.extend(_rules(rule.not_rule))
-    return nested
-
-
-def _check_regex_patterns(spec: SessionSpec, result: ValidationResult) -> None:
+    graph: dict[str, list[str]] = {}
     for ws in spec.workspaces:
         for app in ws.apps:
-            for rule in _rules(app.match):
-                for pattern in [rule.app_id_regex, rule.title_regex]:
-                    if pattern is None:
-                        continue
-                    try:
-                        re.compile(pattern)
-                    except re.error as exc:
-                        result.errors.append(
-                            f"Invalid regex for app '{app.name}' in workspace '{ws.name}': {pattern!r} ({exc})"
-                        )
+            key = f"{ws.name}/{app.name}"
+            graph[key] = [f"{ws.name}/{dep}" for dep in app.depends_on]
+
+    visiting: set[str] = set()
+    visited: set[str] = set()
+
+    def dfs(node: str, path: list[str]) -> None:
+        if node in visiting:
+            i = path.index(node)
+            cycle = path[i:] + [node]
+            errors.append(f"dependency cycle: {' -> '.join(cycle)}")
+            return
+        if node in visited:
+            return
+        visiting.add(node)
+        path.append(node)
+        for nxt in graph.get(node, []):
+            dfs(nxt, path)
+        path.pop()
+        visiting.remove(node)
+        visited.add(node)
+
+    for node in graph:
+        dfs(node, [])
 
 
-def _check_weak_matchers(spec: SessionSpec, result: ValidationResult) -> None:
-    for ws in spec.workspaces:
-        for app in ws.apps:
-            rule = app.match
-            weak = rule.title_regex is not None and rule.app_id is None and rule.app_id_regex is None
-            if weak and not app.optional:
-                result.warnings.append(
-                    f"App '{app.name}' in workspace '{ws.name}' uses title_regex-only matching; this is fragile"
-                )
-
-
-def _match_signature(app: AppSpec) -> tuple[str | None, str | None, str | None, str | None, int | None]:
-    m = app.match
-    return (m.app_id, m.app_id_regex, m.title, m.title_regex, m.pid)
-
-
-def _check_inter_app_conflicts(spec: SessionSpec, result: ValidationResult) -> None:
-    local: dict[tuple[str, tuple[str | None, str | None, str | None, str | None, int | None]], str] = {}
-    global_map: dict[tuple[str | None, str | None, str | None, str | None, int | None], tuple[str, str]] = {}
-
-    for ws in spec.workspaces:
-        for app in ws.apps:
-            sig = _match_signature(app)
-            if app.match.app_id is None:
+def _check_regex_patterns(spec: SessionSpec, errors: list[str]) -> None:
+    def validate_rule(rule: MatchRule, prefix: str) -> None:
+        for field_name, pattern in (("app_id_regex", rule.app_id_regex), ("title_regex", rule.title_regex)):
+            if pattern is None:
                 continue
-            key = (ws.name, sig)
-            if key in local:
-                result.errors.append(
-                    f"Conflicting match criteria in workspace '{ws.name}' for apps '{local[key]}' and '{app.name}'"
-                )
-            else:
-                local[key] = app.name
+            try:
+                re.compile(pattern)
+            except re.error as e:
+                errors.append(f"{prefix}.{field_name} invalid regex '{pattern}': {e}")
+        if rule.any_of:
+            for i, sub in enumerate(rule.any_of):
+                validate_rule(sub, f"{prefix}.any[{i}]")
+        if rule.not_rule:
+            validate_rule(rule.not_rule, f"{prefix}.not")
 
-            if sig in global_map and global_map[sig][0] != ws.name:
-                prev_ws, prev_app = global_map[sig]
-                result.warnings.append(
-                    f"Apps '{prev_app}' ({prev_ws}) and '{app.name}' ({ws.name}) share identical match criteria"
-                )
-            else:
-                global_map[sig] = (ws.name, app.name)
-
-
-def _check_spawn_commands(spec: SessionSpec, result: ValidationResult) -> None:
     for ws in spec.workspaces:
         for app in ws.apps:
-            spawn = app.spawn
-            if spawn is None:
+            validate_rule(app.match, f"{ws.name}/{app.name}.match")
+
+
+def _check_weak_matchers(spec: SessionSpec, warnings: list[str]) -> None:
+    for ws in spec.workspaces:
+        for app in ws.apps:
+            m = app.match
+            if m.title_regex and not any([m.app_id, m.app_id_regex, m.title, m.pid]):
+                warnings.append(
+                    f"weak matcher in {ws.name}/{app.name}: title_regex-only rules can be unstable"
+                )
+
+
+def _check_inter_app_conflicts(spec: SessionSpec, warnings: list[str]) -> None:
+    signatures: dict[tuple[str, str, str, str, int | None], list[str]] = {}
+    for ws in spec.workspaces:
+        for app in ws.apps:
+            m = app.match
+            key = (m.app_id or "", m.app_id_regex or "", m.title or "", m.title_regex or "", m.pid)
+            signatures.setdefault(key, []).append(f"{ws.name}/{app.name}")
+
+    for key, owners in signatures.items():
+        if len(owners) > 1 and key != ("", "", "", "", None):
+            warnings.append(f"potential matcher conflict: {', '.join(owners)}")
+
+
+def _check_spawn_commands(spec: SessionSpec, errors: list[str]) -> None:
+    for ws in spec.workspaces:
+        for app in ws.apps:
+            if app.spawn is None:
                 continue
-            if isinstance(spawn.command, str):
-                if not spawn.command.strip():
-                    result.errors.append(f"Empty spawn command for app '{app.name}' in workspace '{ws.name}'")
-            elif len(spawn.command) == 0:
-                result.errors.append(f"Empty spawn command for app '{app.name}' in workspace '{ws.name}'")
+            cmd = app.spawn.command
+            if isinstance(cmd, str):
+                if not cmd.strip():
+                    errors.append(f"empty spawn command for {ws.name}/{app.name}")
+            elif isinstance(cmd, list):
+                if not cmd or not all(part.strip() for part in cmd):
+                    errors.append(f"empty spawn command for {ws.name}/{app.name}")

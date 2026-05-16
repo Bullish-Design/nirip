@@ -1,53 +1,56 @@
 """Session specification models."""
+
 from __future__ import annotations
 
-import builtins
-from typing import Self
+from typing import Literal
 
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
+
+from nirip._base import NiripModel
 
 
-class MatchRule(BaseModel):
-    """How to find an existing window that fills this role."""
+class MatchRule(NiripModel):
+    """Window matching rule with boolean composition."""
 
-    model_config = ConfigDict(populate_by_name=True)
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        populate_by_name=True,
+    )
 
     app_id: str | None = None
     app_id_regex: str | None = None
     title: str | None = None
     title_regex: str | None = None
     pid: int | None = None
-    any_of: list[MatchRule] | None = Field(default=None, alias="any")
-    not_rule: MatchRule | None = None
+    any_of: list["MatchRule"] | None = Field(None, validation_alias="any")
+    not_rule: "MatchRule" | None = Field(None, validation_alias="not")
 
     @model_validator(mode="after")
-    def validate_not_empty(self) -> Self:
-        criteria = [
-            self.app_id is not None,
-            self.app_id_regex is not None,
-            self.title is not None,
-            self.title_regex is not None,
-            self.pid is not None,
-            self.any_of is not None,
-            self.not_rule is not None,
-        ]
-        if not builtins.any(criteria):
-            raise ValueError("MatchRule must have at least one matching criterion.")
+    def _validate_not_empty(self) -> "MatchRule":
+        has_leaf = any(
+            [
+                self.app_id,
+                self.app_id_regex,
+                self.title,
+                self.title_regex,
+                self.pid is not None,
+            ]
+        )
+        has_composite = self.any_of is not None or self.not_rule is not None
+        if not has_leaf and not has_composite:
+            raise ValueError("MatchRule must have at least one criterion")
         return self
 
 
-class SpawnSpec(BaseModel):
-    """How to launch a window if no match is found."""
-
+class SpawnSpec(NiripModel):
     command: list[str] | str
     cwd: str | None = None
     env: dict[str, str] = Field(default_factory=dict)
     shell: bool = False
 
 
-class PlacementSpec(BaseModel):
-    """Where and how a window should be placed."""
-
+class PlacementSpec(NiripModel):
     floating: bool = False
     fullscreen: bool = False
     maximized: bool = False
@@ -56,15 +59,13 @@ class PlacementSpec(BaseModel):
     window_height: float | str | None = None
 
     @model_validator(mode="after")
-    def validate_placement(self) -> Self:
+    def _validate_mutual_exclusion(self) -> "PlacementSpec":
         if self.floating and self.fullscreen:
             raise ValueError("floating and fullscreen are mutually exclusive")
         return self
 
 
-class AppSpec(BaseModel):
-    """A single window role within a workspace."""
-
+class AppSpec(NiripModel):
     name: str
     match: MatchRule
     spawn: SpawnSpec | None = None
@@ -74,19 +75,15 @@ class AppSpec(BaseModel):
     depends_on: list[str] = Field(default_factory=list)
 
 
-class WorkspaceSpec(BaseModel):
-    """A named workspace and desired window layout."""
-
+class WorkspaceSpec(NiripModel):
     name: str
     output: str | None = None
     focus: bool = False
     apps: list[AppSpec] = Field(default_factory=list)
 
 
-class SessionOptions(BaseModel):
-    """Global options for session apply behavior."""
-
-    mode: str = "reconcile"
+class SessionOptions(NiripModel):
+    mode: Literal["reconcile", "clean"] = "reconcile"
     match_existing: bool = True
     launch_missing: bool = True
     stop_on_error: bool = True
@@ -94,9 +91,7 @@ class SessionOptions(BaseModel):
     default_startup_timeout_s: float = 20.0
 
 
-class SessionSpec(BaseModel):
-    """Top-level session declaration."""
-
+class SessionSpec(NiripModel):
     name: str
     description: str = ""
     options: SessionOptions = Field(default_factory=SessionOptions)

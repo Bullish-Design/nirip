@@ -1,4 +1,5 @@
-"""YAML session spec loader."""
+"""YAML loading and validation pipeline."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,50 +8,39 @@ from typing import Any
 import yaml
 
 from nirip.errors import SpecError, SpecValidationError
+from nirip.spec.defaults import apply_defaults
 from nirip.spec.models import SessionSpec
-from nirip.spec.validators import validate_session
+from nirip.spec.validators import ValidatedSpec, validate_session
 
 
-def _validate_spec(spec: SessionSpec, source: str) -> SessionSpec:
-    result = validate_session(spec)
-    if not result.valid:
-        raise SpecValidationError(
-            f"Spec validation failed in {source}:\n" + "\n".join(f"  - {err}" for err in result.errors)
-        )
-    return spec
+def load_spec_from_file(path: str | Path) -> ValidatedSpec:
+    p = Path(path)
+    if not p.exists():
+        raise SpecError(f"file not found: {p}")
+    text = p.read_text(encoding="utf-8")
+    return load_spec_from_string(text, source=str(p))
 
 
-def load_spec_from_file(path: str | Path) -> SessionSpec:
-    """Load and validate a session spec from a YAML file."""
-
-    resolved = Path(path).expanduser()
-    if not resolved.exists():
-        raise SpecError(f"Session file not found: {resolved}")
-    try:
-        text = resolved.read_text(encoding="utf-8")
-    except OSError as exc:
-        raise SpecError(f"Cannot read session file: {exc}") from exc
-    return load_spec_from_string(text, source=str(resolved))
-
-
-def load_spec_from_string(text: str, *, source: str = "<string>") -> SessionSpec:
-    """Load and validate a session spec from a YAML string."""
-
+def load_spec_from_string(text: str, *, source: str = "<string>") -> ValidatedSpec:
     try:
         data = yaml.safe_load(text)
-    except yaml.YAMLError as exc:
-        raise SpecError(f"Invalid YAML in {source}: {exc}") from exc
-
+    except yaml.YAMLError as e:
+        raise SpecError(f"YAML parse error in {source}: {e}") from e
     if not isinstance(data, dict):
-        raise SpecError(f"Expected a YAML mapping at top level in {source}, got {type(data).__name__}")
+        raise SpecError(f"expected mapping in {source}, got {type(data).__name__}")
     return load_spec_from_dict(data, source=source)
 
 
-def load_spec_from_dict(data: dict[str, Any], *, source: str = "<dict>") -> SessionSpec:
-    """Load and validate a session spec from a dictionary."""
-
+def load_spec_from_dict(data: dict[str, Any], *, source: str = "<dict>") -> ValidatedSpec:
     try:
         spec = SessionSpec.model_validate(data)
-    except Exception as exc:  # noqa: BLE001
-        raise SpecError(f"Invalid session spec in {source}: {exc}") from exc
-    return _validate_spec(spec, source)
+    except Exception as e:
+        raise SpecError(f"spec parse error in {source}: {e}") from e
+
+    spec = apply_defaults(spec)
+    validation = validate_session(spec)
+
+    if not validation.valid:
+        raise SpecValidationError(validation.errors, validation.warnings)
+
+    return ValidatedSpec(spec=spec, validation=validation)
