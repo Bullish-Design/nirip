@@ -1,67 +1,41 @@
-"""Step verification predicates."""
+"""Skip-check predicates for plan steps."""
+
 from __future__ import annotations
 
-from collections.abc import Callable
-from typing import Any, Protocol
+from niri_state import Snapshot
 
-from nirip.planning.models import PlanStep, StepKind
+from nirip.planning.models import (
+    EnsureWorkspaceStep,
+    MoveWindowToWorkspaceStep,
+    PlanStep,
+    SetFloatingStep,
+    SetFullscreenStep,
+    SetMaximizedStep,
+    SetTilingStep,
+)
 
 
-class SnapshotLike(Protocol):
-    windows: dict[int, Any]
-    workspaces: dict[int, Any]
-
-
-StepPredicate = Callable[[SnapshotLike], bool]
-
-
-def predicate_for_step(step: PlanStep) -> StepPredicate | None:
-    """Return a predicate that checks if a step's outcome is already satisfied."""
-
-    if step.kind == StepKind.WAIT_FOR_WINDOW:
-        return None
-
-    if step.kind == StepKind.ENSURE_WORKSPACE:
-        ws_name = step.workspace_name
-
-        def _ws_exists(snapshot: SnapshotLike) -> bool:
-            return any(getattr(ws, "name", None) == ws_name for ws in snapshot.workspaces.values())
-
-        return _ws_exists
-
-    if step.kind == StepKind.MOVE_WINDOW_TO_WORKSPACE:
-        window_id = step.window_id
-        ws_name = step.workspace_name
-
-        def _window_in_ws(snapshot: SnapshotLike) -> bool:
-            if window_id is None or ws_name is None:
+def is_already_satisfied(step: PlanStep, snapshot: Snapshot) -> bool:
+    match step:
+        case EnsureWorkspaceStep():
+            return any(ws.name == step.workspace_name for ws in snapshot.workspaces.values())
+        case MoveWindowToWorkspaceStep():
+            w = snapshot.windows.get(step.window_id)
+            if w is None:
                 return False
-            window = snapshot.windows.get(window_id)
-            if window is None:
-                return False
-            target_ws = None
-            for ws in snapshot.workspaces.values():
-                if getattr(ws, "name", None) == ws_name:
-                    target_ws = ws
-                    break
-            if target_ws is None:
-                return False
-            return getattr(window, "workspace_id", None) == getattr(target_ws, "id", None)
-
-        return _window_in_ws
-
-    if step.kind in (StepKind.SET_FLOATING, StepKind.SET_TILING):
-        window_id = step.window_id
-        want_floating = step.kind == StepKind.SET_FLOATING
-
-        def _float_matches(snapshot: SnapshotLike) -> bool:
-            if window_id is None:
-                return False
-            window = snapshot.windows.get(window_id)
-            if window is None:
-                return False
-            return getattr(window, "is_floating", None) == want_floating
-
-        return _float_matches
-
-    return None
+            target = next((ws for ws in snapshot.workspaces.values() if ws.name == step.target_workspace), None)
+            return target is not None and w.workspace_id == target.id
+        case SetFloatingStep():
+            w = snapshot.windows.get(step.window_id)
+            return w is not None and w.is_floating
+        case SetTilingStep():
+            w = snapshot.windows.get(step.window_id)
+            return w is not None and not w.is_floating
+        case SetFullscreenStep():
+            w = snapshot.windows.get(step.window_id)
+            return w is not None and w.is_fullscreen == step.fullscreen
+        case SetMaximizedStep():
+            w = snapshot.windows.get(step.window_id)
+            return w is not None and getattr(w, "is_maximized", False) == step.maximized
+        case _:
+            return False

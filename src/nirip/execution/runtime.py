@@ -1,11 +1,12 @@
-"""Execution runtime state."""
+"""Ephemeral execution tracking state."""
+
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class AppRuntimeState(BaseModel):
-    """Ephemeral state for one app during a single apply."""
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     app_name: str
     workspace_name: str
@@ -17,7 +18,7 @@ class AppRuntimeState(BaseModel):
 
 
 class SessionRuntime(BaseModel):
-    """Ephemeral state during a single apply operation."""
+    model_config = ConfigDict(extra="forbid", frozen=False)
 
     session_name: str
     apps: dict[str, AppRuntimeState] = Field(default_factory=dict)
