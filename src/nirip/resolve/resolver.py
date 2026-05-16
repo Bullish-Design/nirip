@@ -99,31 +99,31 @@ def _detect_drift(window: object, napp: object, ws_name: str, ws_by_name: dict[s
     elif window_ws_id != getattr(target_ws, "id", None):
         drift.append(DriftItem(kind=DriftKind.WRONG_WORKSPACE, current=str(window_ws_id), desired=ws_name))
 
-    if getattr(window, "is_floating", False) != getattr(napp.placement, "floating"):
+    if getattr(window, "is_floating", False) != napp.placement.floating:
         drift.append(
             DriftItem(
                 kind=DriftKind.WRONG_FLOATING,
                 current=str(getattr(window, "is_floating", False)),
-                desired=str(getattr(napp.placement, "floating")),
+                desired=str(napp.placement.floating),
             )
         )
 
-    if getattr(window, "is_fullscreen", False) != getattr(napp.placement, "fullscreen"):
+    if getattr(window, "is_fullscreen", False) != napp.placement.fullscreen:
         drift.append(
             DriftItem(
                 kind=DriftKind.WRONG_FULLSCREEN,
                 current=str(getattr(window, "is_fullscreen", False)),
-                desired=str(getattr(napp.placement, "fullscreen")),
+                desired=str(napp.placement.fullscreen),
             )
         )
 
     if hasattr(window, "is_maximized"):
-        if getattr(window, "is_maximized") != getattr(napp.placement, "maximized"):
+        if window.is_maximized != napp.placement.maximized:
             drift.append(
                 DriftItem(
                     kind=DriftKind.WRONG_MAXIMIZED,
-                    current=str(getattr(window, "is_maximized")),
-                    desired=str(getattr(napp.placement, "maximized")),
+                    current=str(window.is_maximized),
+                    desired=str(napp.placement.maximized),
                 )
             )
 

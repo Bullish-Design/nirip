@@ -23,11 +23,11 @@ class MatchRule(NiripModel):
     title: str | None = None
     title_regex: str | None = None
     pid: int | None = None
-    any_of: list["MatchRule"] | None = Field(None, validation_alias="any")
-    not_rule: "MatchRule" | None = Field(None, validation_alias="not")
+    any_of: list[MatchRule] | None = Field(None, validation_alias="any")
+    not_rule: MatchRule | None = Field(None, validation_alias="not")
 
     @model_validator(mode="after")
-    def _validate_not_empty(self) -> "MatchRule":
+    def _validate_not_empty(self) -> MatchRule:
         has_leaf = any(
             [
                 self.app_id,
@@ -59,7 +59,7 @@ class PlacementSpec(NiripModel):
     window_height: float | str | None = None
 
     @model_validator(mode="after")
-    def _validate_mutual_exclusion(self) -> "PlacementSpec":
+    def _validate_mutual_exclusion(self) -> PlacementSpec:
         if self.floating and self.fullscreen:
             raise ValueError("floating and fullscreen are mutually exclusive")
         return self

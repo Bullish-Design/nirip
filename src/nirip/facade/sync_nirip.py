@@ -21,7 +21,7 @@ class SyncNirip:
         self._async = AsyncNirip(state=state, client=client, config=config)
 
     @classmethod
-    def open(cls, config: NiripConfig | None = None) -> "SyncNirip":
+    def open(cls, config: NiripConfig | None = None) -> SyncNirip:
         state = asyncio.run(NiriState.open())
         client = NiriClient.create()
         return cls(state=state, client=client, config=config)
@@ -41,7 +41,7 @@ class SyncNirip:
     def close(self) -> None:
         asyncio.run(self._async.close())
 
-    def __enter__(self) -> "SyncNirip":
+    def __enter__(self) -> SyncNirip:
         return self
 
     def __exit__(self, *_args: Any) -> None:

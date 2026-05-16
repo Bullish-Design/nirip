@@ -1,15 +1,16 @@
-"""Shared test fixtures."""
+"""Shared test fakes and fixtures."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
-class Win:
-    """Mock window for testing."""
-
+class FakeWindow:
     id: int
-    app_id: str | None = None
-    title: str | None = None
+    app_id: str = ""
+    title: str = ""
     pid: int | None = None
     workspace_id: int | None = None
     is_floating: bool = False
@@ -18,17 +19,34 @@ class Win:
 
 
 @dataclass
-class Ws:
-    """Mock workspace for testing."""
-
+class FakeWorkspace:
     id: int
     name: str | None = None
-    output: str | None = None
+    output: str = "DP-1"
+    is_active: bool = False
 
 
 @dataclass
-class Snap:
-    """Mock snapshot for testing."""
+class FakeSnapshot:
+    windows: dict[int, Any] = field(default_factory=dict)
+    workspaces: dict[int, Any] = field(default_factory=dict)
+    outputs: dict[str, Any] = field(default_factory=dict)
+    focused_window_id: int | None = None
+    focused_workspace_id: int | None = None
 
-    windows: dict[int, Win] = field(default_factory=dict)
-    workspaces: dict[int, Ws] = field(default_factory=dict)
+
+class RecordingClient:
+    def __init__(self) -> None:
+        self.requests: list[Any] = []
+        self._closed = False
+
+    async def request(self, req: Any, **kw: Any) -> Any:
+        self.requests.append(req)
+        return None
+
+    async def close(self) -> None:
+        self._closed = True
+
+    @property
+    def is_closed(self) -> bool:
+        return self._closed

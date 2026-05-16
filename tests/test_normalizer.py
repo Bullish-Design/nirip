@@ -2,14 +2,12 @@ from nirip.resolve.normalizer import normalize
 from nirip.spec.models import AppSpec, MatchRule, SessionSpec, WorkspaceSpec
 
 
-def test_basic_normalization() -> None:
+def test_normalize_basic() -> None:
+    app = AppSpec(name="a", match=MatchRule(app_id="x"))
     spec = SessionSpec(
-        name="test",
-        workspaces=[
-            WorkspaceSpec(name="code", apps=[AppSpec(name="editor", match=MatchRule(app_id="nvim"))]),
-            WorkspaceSpec(name="comms", apps=[AppSpec(name="slack", match=MatchRule(app_id="Slack"))]),
-        ],
+        name="s",
+        workspaces=[WorkspaceSpec(name="w", apps=[app])],
     )
-    norm = normalize(spec)
-    assert len(norm.apps) == 2
-    assert "code/editor" in norm.app_index
+    n = normalize(spec)
+    assert len(n.apps) == 1
+    assert n.app_index["w/a"].name == "a"

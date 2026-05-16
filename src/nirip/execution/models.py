@@ -5,10 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import StrEnum
 
-from pydantic import computed_field
-
 from niri_pypc import NiriClient
 from niri_state import NiriState
+from pydantic import computed_field
 
 from nirip._base import NiripModel
 from nirip.planning.models import PlanStep

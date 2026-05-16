@@ -2,10 +2,9 @@
 
 from __future__ import annotations
 
-from pydantic import computed_field
-
 from niri_state import Snapshot
 from niri_state.api.selectors import windows, workspaces
+from pydantic import computed_field
 
 from nirip._base import NiripModel
 from nirip.capture.inference import infer_app_name, infer_match_rule

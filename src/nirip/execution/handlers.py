@@ -57,9 +57,10 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                 await _request(ports.client, actions.focus_workspace(step.workspace_name or ""))
                 return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="workspace ensured")
             case MoveWorkspaceToOutputStep():
+                workspace_ref = actions.workspace_by_name(step.workspace_name or "")
                 await _request(
                     ports.client,
-                    actions.move_workspace_to_monitor(step.target_output, actions.workspace_by_name(step.workspace_name or "")),
+                    actions.move_workspace_to_monitor(step.target_output, workspace_ref),
                 )
                 return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="workspace moved")
             case SpawnWindowStep():
@@ -87,23 +88,49 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                 await _wait(ports.state, predicate, step.timeout_s)
                 return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="window appeared")
             case MoveWindowToWorkspaceStep():
+                workspace_ref = actions.workspace_by_name(step.target_workspace)
                 await _request(
                     ports.client,
-                    actions.move_window_to_workspace(actions.workspace_by_name(step.target_workspace), window_id=step.window_id),
+                    actions.move_window_to_workspace(workspace_ref, window_id=step.window_id),
                 )
-                return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="window moved", window_id=step.window_id)
+                return StepResult(
+                    step=step,
+                    outcome=StepOutcome.COMPLETED,
+                    message="window moved",
+                    window_id=step.window_id,
+                )
             case SetFloatingStep():
                 await _request(ports.client, actions.move_window_to_floating(step.window_id))
-                return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="window set floating", window_id=step.window_id)
+                return StepResult(
+                    step=step,
+                    outcome=StepOutcome.COMPLETED,
+                    message="window set floating",
+                    window_id=step.window_id,
+                )
             case SetTilingStep():
                 await _request(ports.client, actions.move_window_to_tiling(step.window_id))
-                return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="window set tiling", window_id=step.window_id)
+                return StepResult(
+                    step=step,
+                    outcome=StepOutcome.COMPLETED,
+                    message="window set tiling",
+                    window_id=step.window_id,
+                )
             case SetFullscreenStep():
                 await _request(ports.client, actions.fullscreen_window(step.window_id))
-                return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="fullscreen toggled", window_id=step.window_id)
+                return StepResult(
+                    step=step,
+                    outcome=StepOutcome.COMPLETED,
+                    message="fullscreen toggled",
+                    window_id=step.window_id,
+                )
             case SetMaximizedStep():
                 await _request(ports.client, actions.maximize_window_to_edges(step.window_id))
-                return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="maximized toggled", window_id=step.window_id)
+                return StepResult(
+                    step=step,
+                    outcome=StepOutcome.COMPLETED,
+                    message="maximized toggled",
+                    window_id=step.window_id,
+                )
             case SetColumnWidthStep():
                 await _request(ports.client, actions.focus_window(step.window_id))
                 change = (
@@ -112,7 +139,12 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                     else actions.size_set_fixed(step.pixels or 0)
                 )
                 await _request(ports.client, actions.set_column_width(change))
-                return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="column width set", window_id=step.window_id)
+                return StepResult(
+                    step=step,
+                    outcome=StepOutcome.COMPLETED,
+                    message="column width set",
+                    window_id=step.window_id,
+                )
             case SetWindowHeightStep():
                 change = (
                     actions.size_set_proportion(step.proportion)
@@ -120,10 +152,20 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                     else actions.size_set_fixed(step.pixels or 0)
                 )
                 await _request(ports.client, actions.set_window_height(change, step.window_id))
-                return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="window height set", window_id=step.window_id)
+                return StepResult(
+                    step=step,
+                    outcome=StepOutcome.COMPLETED,
+                    message="window height set",
+                    window_id=step.window_id,
+                )
             case FocusWindowStep():
                 await _request(ports.client, actions.focus_window(step.window_id))
-                return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="window focused", window_id=step.window_id)
+                return StepResult(
+                    step=step,
+                    outcome=StepOutcome.COMPLETED,
+                    message="window focused",
+                    window_id=step.window_id,
+                )
             case FocusWorkspaceStep():
                 await _request(ports.client, actions.focus_workspace(step.workspace_name or ""))
                 return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="workspace focused")

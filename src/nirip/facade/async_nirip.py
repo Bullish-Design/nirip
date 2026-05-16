@@ -27,7 +27,7 @@ class AsyncNirip:
         self._config = config or NiripConfig()
 
     @classmethod
-    async def open(cls, config: NiripConfig | None = None) -> "AsyncNirip":
+    async def open(cls, config: NiripConfig | None = None) -> AsyncNirip:
         state = await NiriState.open()
         client = NiriClient.create()
         return cls(state=state, client=client, config=config)
@@ -66,7 +66,7 @@ class AsyncNirip:
         await self._state.close()
         await self._client.close()
 
-    async def __aenter__(self) -> "AsyncNirip":
+    async def __aenter__(self) -> AsyncNirip:
         return self
 
     async def __aexit__(self, *args: Any) -> None:
