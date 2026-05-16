@@ -1,16 +1,16 @@
-"""Resolution and normalization models."""
+"""Resolution layer models."""
+
 from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import Field, computed_field
 
+from nirip._base import NiripModel
 from nirip.spec.models import MatchRule, PlacementSpec, SessionOptions, SpawnSpec
 
 
-class NormalizedApp(BaseModel):
-    """An app after default merging and reference resolution."""
-
+class NormalizedApp(NiripModel):
     name: str
     workspace_name: str
     match: MatchRule
@@ -21,18 +21,14 @@ class NormalizedApp(BaseModel):
     depends_on: list[str]
 
 
-class NormalizedWorkspace(BaseModel):
-    """A workspace after default merging."""
-
+class NormalizedWorkspace(NiripModel):
     name: str
     output: str | None
     focus: bool
     app_names: list[str]
 
 
-class NormalizedSession(BaseModel):
-    """The session spec after all normalization passes."""
-
+class NormalizedSession(NiripModel):
     name: str
     description: str
     options: SessionOptions
@@ -41,20 +37,16 @@ class NormalizedSession(BaseModel):
     app_index: dict[str, NormalizedApp] = Field(default_factory=dict)
 
 
-class MatchCandidate(BaseModel):
-    """A single window evaluated against a MatchRule."""
-
+class MatchCandidate(NiripModel):
     window_id: int
     confidence: float
     reasons: list[str]
 
 
-class MatchDecision(BaseModel):
-    """Result of matching an app against all live windows."""
-
+class MatchDecision(NiripModel):
     app_name: str
     workspace_name: str
-    best: int | None = None
+    assigned_window_id: int | None = None
     candidates: list[MatchCandidate]
     confidence: float = 0.0
     rationale: list[str]
@@ -62,13 +54,12 @@ class MatchDecision(BaseModel):
     @computed_field
     @property
     def is_ambiguous(self) -> bool:
-        high_confidence = [c for c in self.candidates if c.confidence > 0.6]
-        return len(high_confidence) > 1
+        return sum(1 for c in self.candidates if c.confidence > 0.6) > 1
 
     @computed_field
     @property
     def is_matched(self) -> bool:
-        return self.best is not None
+        return self.assigned_window_id is not None
 
 
 class ResolutionStatus(StrEnum):
@@ -86,17 +77,13 @@ class DriftKind(StrEnum):
     WRONG_MAXIMIZED = "wrong_maximized"
 
 
-class DriftItem(BaseModel):
-    """A single deviation from desired state."""
-
+class DriftItem(NiripModel):
     kind: DriftKind
     current: str
     desired: str
 
 
-class AppResolution(BaseModel):
-    """Resolution status for a single declared app."""
-
+class AppResolution(NiripModel):
     app_name: str
     workspace_name: str
     status: ResolutionStatus
@@ -115,9 +102,7 @@ class AppResolution(BaseModel):
         return any(d.kind == DriftKind.WRONG_WORKSPACE for d in self.drift)
 
 
-class WorkspaceResolution(BaseModel):
-    """Resolution status for a single declared workspace."""
-
+class WorkspaceResolution(NiripModel):
     name: str
     exists: bool
     output_correct: bool
@@ -126,9 +111,7 @@ class WorkspaceResolution(BaseModel):
     app_resolutions: list[AppResolution]
 
 
-class Resolution(BaseModel):
-    """Complete resolution of a session spec against live state."""
-
+class Resolution(NiripModel):
     session_name: str
     workspace_resolutions: list[WorkspaceResolution]
     unmatched_apps: list[AppResolution]
@@ -138,11 +121,14 @@ class Resolution(BaseModel):
     @computed_field
     @property
     def has_drift(self) -> bool:
-        return any(
-            app.action_required for ws in self.workspace_resolutions for app in ws.app_resolutions
-        ) or any((not ws.exists or not ws.output_correct) for ws in self.workspace_resolutions)
+        for wr in self.workspace_resolutions:
+            if not wr.exists or not wr.output_correct:
+                return True
+            if any(ar.action_required for ar in wr.app_resolutions):
+                return True
+        return bool(self.unmatched_apps)
 
     @computed_field
     @property
     def fully_converged(self) -> bool:
-        return not self.has_drift and not self.unmatched_apps and not self.ambiguous_apps
+        return not self.has_drift and not self.ambiguous_apps

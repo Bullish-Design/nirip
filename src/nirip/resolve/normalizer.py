@@ -1,50 +1,41 @@
-"""Spec normalization: SessionSpec -> NormalizedSession."""
+"""Spec normalization."""
+
 from __future__ import annotations
 
 from nirip.resolve.models import NormalizedApp, NormalizedSession, NormalizedWorkspace
-from nirip.spec.defaults import apply_defaults
 from nirip.spec.models import SessionSpec
 
 
 def normalize(spec: SessionSpec) -> NormalizedSession:
-    """Transform a validated SessionSpec into a NormalizedSession."""
-
-    with_defaults = apply_defaults(spec)
-    workspaces: list[NormalizedWorkspace] = []
     apps: list[NormalizedApp] = []
+    workspaces: list[NormalizedWorkspace] = []
     app_index: dict[str, NormalizedApp] = {}
 
-    for ws in with_defaults.workspaces:
+    for ws in spec.workspaces:
         app_names: list[str] = []
-        for app in ws.apps:
-            key = f"{ws.name}/{app.name}"
-            normalized = NormalizedApp(
-                name=app.name,
+        for app_spec in ws.apps:
+            na = NormalizedApp(
+                name=app_spec.name,
                 workspace_name=ws.name,
-                match=app.match,
-                spawn=app.spawn,
-                placement=app.placement,
-                optional=app.optional,
-                startup_timeout_s=app.startup_timeout_s,
-                depends_on=app.depends_on,
+                match=app_spec.match,
+                spawn=app_spec.spawn,
+                placement=app_spec.placement,
+                optional=app_spec.optional,
+                startup_timeout_s=(app_spec.startup_timeout_s or spec.options.default_startup_timeout_s),
+                depends_on=app_spec.depends_on,
             )
-            app_names.append(app.name)
-            apps.append(normalized)
-            app_index[key] = normalized
+            apps.append(na)
+            app_names.append(app_spec.name)
+            app_index[f"{ws.name}/{app_spec.name}"] = na
 
         workspaces.append(
-            NormalizedWorkspace(
-                name=ws.name,
-                output=ws.output,
-                focus=ws.focus,
-                app_names=app_names,
-            )
+            NormalizedWorkspace(name=ws.name, output=ws.output, focus=ws.focus, app_names=app_names)
         )
 
     return NormalizedSession(
-        name=with_defaults.name,
-        description=with_defaults.description,
-        options=with_defaults.options,
+        name=spec.name,
+        description=spec.description,
+        options=spec.options,
         workspaces=workspaces,
         apps=apps,
         app_index=app_index,

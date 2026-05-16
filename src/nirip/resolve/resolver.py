@@ -1,9 +1,10 @@
-"""Resolve desired session state against a live snapshot."""
+"""Session resolution against live compositor state."""
+
 from __future__ import annotations
 
-from typing import Protocol
+from niri_state import Snapshot
 
-from nirip.resolve.matcher import WindowLike, match_app
+from nirip.resolve.matcher import assign_windows
 from nirip.resolve.models import (
     AppResolution,
     DriftItem,
@@ -15,122 +16,66 @@ from nirip.resolve.models import (
 )
 
 
-class WorkspaceLike(Protocol):
-    id: int
-    name: str | None
-    output: str | None
+def resolve(normalized: NormalizedSession, snapshot: Snapshot) -> Resolution:
+    """Resolve a normalized session against a live snapshot."""
+    ws_by_name = {ws.name: ws for ws in snapshot.workspaces.values() if ws.name is not None}
 
+    decisions = assign_windows(normalized.apps, snapshot.windows.values())
+    decision_index = {(d.workspace_name, d.app_name): d for d in decisions}
 
-class SnapshotLike(Protocol):
-    windows: dict[int, WindowLike]
-    workspaces: dict[int, WorkspaceLike]
-
-
-def _workspace_by_name(snapshot: SnapshotLike, name: str) -> WorkspaceLike | None:
-    for workspace in snapshot.workspaces.values():
-        if workspace.name == name:
-            return workspace
-    return None
-
-
-def resolve(normalized: NormalizedSession, snapshot: SnapshotLike) -> Resolution:
-    """Resolve normalized session against current snapshot."""
-
-    all_windows = list(snapshot.windows.values())
     workspace_resolutions: list[WorkspaceResolution] = []
     unmatched: list[AppResolution] = []
     ambiguous: list[AppResolution] = []
-    warnings: list[str] = []
 
-    for ws in normalized.workspaces:
-        live_ws = _workspace_by_name(snapshot, ws.name)
+    for nws in normalized.workspaces:
+        live_ws = ws_by_name.get(nws.name)
         exists = live_ws is not None
-        current_output = live_ws.output if live_ws else None
-        output_correct = ws.output is None or ws.output == current_output
+        output_correct = exists and (nws.output is None or live_ws.output == nws.output)
 
         app_resolutions: list[AppResolution] = []
-        for app_name in ws.app_names:
-            app = normalized.app_index[f"{ws.name}/{app_name}"]
-            decision = match_app(app.name, ws.name, app.match, all_windows)
-            drift: list[DriftItem] = []
+        for app_name in nws.app_names:
+            napp = normalized.app_index[f"{nws.name}/{app_name}"]
+            decision = decision_index[(nws.name, app_name)]
 
-            status = ResolutionStatus.MATCHED
-            action_required = False
+            if decision.assigned_window_id is not None:
+                window = snapshot.windows[decision.assigned_window_id]
+                drift = _detect_drift(window, napp, nws.name, ws_by_name)
+                status = ResolutionStatus.DRIFTED if drift else ResolutionStatus.MATCHED
+                action_required = bool(drift)
+            else:
+                drift = []
+                if napp.optional:
+                    status = ResolutionStatus.OPTIONAL_MISSING
+                    action_required = False
+                else:
+                    status = ResolutionStatus.MISSING
+                    action_required = normalized.options.launch_missing
 
             if decision.is_ambiguous:
                 status = ResolutionStatus.AMBIGUOUS
-                action_required = True
-            elif not decision.is_matched:
-                if app.optional:
-                    status = ResolutionStatus.OPTIONAL_MISSING
-                else:
-                    status = ResolutionStatus.MISSING
-                    action_required = True
-            else:
-                window = snapshot.windows.get(decision.best)
-                if window is not None and live_ws is not None and window.workspace_id != live_ws.id:
-                    drift.append(
-                        DriftItem(
-                            kind=DriftKind.WRONG_WORKSPACE,
-                            current=str(window.workspace_id),
-                            desired=str(live_ws.id),
-                        )
-                    )
-                if window is not None and window.is_floating != app.placement.floating:
-                    drift.append(
-                        DriftItem(
-                            kind=DriftKind.WRONG_FLOATING,
-                            current=str(window.is_floating),
-                            desired=str(app.placement.floating),
-                        )
-                    )
-                if window is not None and window.is_fullscreen != app.placement.fullscreen:
-                    drift.append(
-                        DriftItem(
-                            kind=DriftKind.WRONG_FULLSCREEN,
-                            current=str(window.is_fullscreen),
-                            desired=str(app.placement.fullscreen),
-                        )
-                    )
-                if window is not None and window.is_maximized != app.placement.maximized:
-                    drift.append(
-                        DriftItem(
-                            kind=DriftKind.WRONG_MAXIMIZED,
-                            current=str(window.is_maximized),
-                            desired=str(app.placement.maximized),
-                        )
-                    )
 
-                if drift:
-                    status = ResolutionStatus.DRIFTED
-                    action_required = True
-
-            app_resolution = AppResolution(
-                app_name=app.name,
-                workspace_name=ws.name,
+            ar = AppResolution(
+                app_name=app_name,
+                workspace_name=nws.name,
                 status=status,
                 match_decision=decision,
                 drift=drift,
                 action_required=action_required,
             )
-            app_resolutions.append(app_resolution)
-            if status == ResolutionStatus.MISSING:
-                unmatched.append(app_resolution)
-            if status == ResolutionStatus.AMBIGUOUS:
-                ambiguous.append(app_resolution)
+            app_resolutions.append(ar)
 
-        if not output_correct:
-            warnings.append(
-                f"Workspace '{ws.name}' on output '{current_output}', desired '{ws.output}'"
-            )
+            if status == ResolutionStatus.MISSING:
+                unmatched.append(ar)
+            if status == ResolutionStatus.AMBIGUOUS:
+                ambiguous.append(ar)
 
         workspace_resolutions.append(
             WorkspaceResolution(
-                name=ws.name,
+                name=nws.name,
                 exists=exists,
                 output_correct=output_correct,
-                desired_output=ws.output,
-                current_output=current_output,
+                desired_output=nws.output,
+                current_output=live_ws.output if live_ws else None,
                 app_resolutions=app_resolutions,
             )
         )
@@ -140,5 +85,46 @@ def resolve(normalized: NormalizedSession, snapshot: SnapshotLike) -> Resolution
         workspace_resolutions=workspace_resolutions,
         unmatched_apps=unmatched,
         ambiguous_apps=ambiguous,
-        warnings=warnings,
+        warnings=[],
     )
+
+
+def _detect_drift(window: object, napp: object, ws_name: str, ws_by_name: dict[str, object]) -> list[DriftItem]:
+    drift: list[DriftItem] = []
+
+    target_ws = ws_by_name.get(ws_name)
+    window_ws_id = getattr(window, "workspace_id", None)
+    if target_ws is None:
+        drift.append(DriftItem(kind=DriftKind.WRONG_WORKSPACE, current=str(window_ws_id), desired=ws_name))
+    elif window_ws_id != getattr(target_ws, "id", None):
+        drift.append(DriftItem(kind=DriftKind.WRONG_WORKSPACE, current=str(window_ws_id), desired=ws_name))
+
+    if getattr(window, "is_floating", False) != getattr(napp.placement, "floating"):
+        drift.append(
+            DriftItem(
+                kind=DriftKind.WRONG_FLOATING,
+                current=str(getattr(window, "is_floating", False)),
+                desired=str(getattr(napp.placement, "floating")),
+            )
+        )
+
+    if getattr(window, "is_fullscreen", False) != getattr(napp.placement, "fullscreen"):
+        drift.append(
+            DriftItem(
+                kind=DriftKind.WRONG_FULLSCREEN,
+                current=str(getattr(window, "is_fullscreen", False)),
+                desired=str(getattr(napp.placement, "fullscreen")),
+            )
+        )
+
+    if hasattr(window, "is_maximized"):
+        if getattr(window, "is_maximized") != getattr(napp.placement, "maximized"):
+            drift.append(
+                DriftItem(
+                    kind=DriftKind.WRONG_MAXIMIZED,
+                    current=str(getattr(window, "is_maximized")),
+                    desired=str(getattr(napp.placement, "maximized")),
+                )
+            )
+
+    return drift
