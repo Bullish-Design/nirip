@@ -1,165 +1,241 @@
-"""Compile Resolution to Plan and SessionDiff."""
+"""Plan compilation from resolution."""
+
 from __future__ import annotations
 
-from nirip.planning.models import Plan, PlanStep, SessionDiff, StepKind
+from nirip.planning.models import (
+    EnsureWorkspaceStep,
+    FocusWindowStep,
+    FocusWorkspaceStep,
+    MoveWindowToWorkspaceStep,
+    MoveWorkspaceToOutputStep,
+    Plan,
+    PlanStep,
+    SessionDiff,
+    SetColumnWidthStep,
+    SetFloatingStep,
+    SetFullscreenStep,
+    SetMaximizedStep,
+    SetTilingStep,
+    SetWindowHeightStep,
+    SpawnWindowStep,
+    WaitForWindowStep,
+)
 from nirip.planning.ordering import topological_sort
-from nirip.resolve.models import DriftKind, Resolution, ResolutionStatus
+from nirip.resolve.models import DriftKind, NormalizedSession, Resolution, ResolutionStatus
 
 
-def compile_plan(resolution: Resolution) -> Plan:
-    """Compile a resolution into an execution plan."""
-
+def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
+    """Compile resolution into ordered execution plan."""
     steps: list[PlanStep] = []
-    warnings = list(resolution.warnings)
-    counter = 0
+    step_counter = 0
 
-    def new_id(prefix: str) -> str:
-        nonlocal counter
-        counter += 1
-        return f"{prefix}-{counter}"
+    def next_id(prefix: str) -> str:
+        nonlocal step_counter
+        step_counter += 1
+        return f"{prefix}-{step_counter}"
 
-    for ws in resolution.workspace_resolutions:
-        if not ws.exists:
+    for wr in resolution.workspace_resolutions:
+        ensure_id = None
+
+        if not wr.exists:
+            ensure_id = next_id("ensure-ws")
             steps.append(
-                PlanStep(
-                    id=new_id("ws"),
-                    kind=StepKind.ENSURE_WORKSPACE,
-                    workspace_name=ws.name,
-                    description=f"Ensure workspace '{ws.name}' exists",
+                EnsureWorkspaceStep(
+                    id=ensure_id,
+                    description=f"create workspace '{wr.name}'",
+                    workspace_name=wr.name,
+                    target_output=wr.desired_output,
                 )
             )
-        if ws.desired_output and not ws.output_correct:
+        elif not wr.output_correct and wr.desired_output:
             steps.append(
-                PlanStep(
-                    id=new_id("ws-move"),
-                    kind=StepKind.MOVE_WORKSPACE_TO_OUTPUT,
-                    workspace_name=ws.name,
-                    description=f"Move workspace '{ws.name}' to output '{ws.desired_output}'",
-                    metadata={"output": ws.desired_output},
+                MoveWorkspaceToOutputStep(
+                    id=next_id("move-ws"),
+                    description=f"move workspace '{wr.name}' to {wr.desired_output}",
+                    workspace_name=wr.name,
+                    target_output=wr.desired_output,
                 )
             )
 
-        for app in ws.app_resolutions:
-            if app.status == ResolutionStatus.MATCHED:
-                continue
-            if app.status == ResolutionStatus.AMBIGUOUS:
-                warnings.append(f"Ambiguous match for {app.workspace_name}/{app.app_name}; skipping")
-                continue
-            if app.status == ResolutionStatus.OPTIONAL_MISSING:
-                continue
-            if app.status == ResolutionStatus.MISSING:
-                spawn_id = new_id("spawn")
+        for ar in wr.app_resolutions:
+            napp = normalized.app_index[f"{wr.name}/{ar.app_name}"]
+            deps = [ensure_id] if ensure_id else []
+
+            if ar.needs_spawn and napp.spawn:
+                spawn_id = next_id("spawn")
                 steps.append(
-                    PlanStep(
+                    SpawnWindowStep(
                         id=spawn_id,
-                        kind=StepKind.SPAWN_WINDOW,
-                        app_name=app.app_name,
-                        workspace_name=app.workspace_name,
-                        description=f"Spawn app '{app.app_name}'",
+                        description=f"spawn {ar.app_name}",
+                        app_name=ar.app_name,
+                        workspace_name=wr.name,
+                        command=napp.spawn.command,
+                        cwd=napp.spawn.cwd,
+                        env=napp.spawn.env,
+                        shell=napp.spawn.shell,
+                        depends_on=deps,
                     )
                 )
                 steps.append(
-                    PlanStep(
-                        id=new_id("wait"),
-                        kind=StepKind.WAIT_FOR_WINDOW,
-                        app_name=app.app_name,
-                        workspace_name=app.workspace_name,
-                        description=f"Wait for app '{app.app_name}' window",
+                    WaitForWindowStep(
+                        id=next_id("wait"),
+                        description=f"wait for {ar.app_name}",
+                        app_name=ar.app_name,
+                        workspace_name=wr.name,
+                        match=napp.match,
+                        timeout_s=napp.startup_timeout_s,
                         depends_on=[spawn_id],
                     )
                 )
-            if app.status == ResolutionStatus.DRIFTED:
-                for drift in app.drift:
-                    if drift.kind == DriftKind.WRONG_WORKSPACE:
+
+            wid = ar.match_decision.assigned_window_id
+
+            if ar.needs_move and wid is not None:
+                steps.append(
+                    MoveWindowToWorkspaceStep(
+                        id=next_id("move"),
+                        description=f"move {ar.app_name} to '{wr.name}'",
+                        app_name=ar.app_name,
+                        workspace_name=wr.name,
+                        window_id=wid,
+                        target_workspace=wr.name,
+                        depends_on=deps,
+                    )
+                )
+
+            if wid is not None:
+                for d in ar.drift:
+                    if d.kind == DriftKind.WRONG_FLOATING:
+                        if napp.placement.floating:
+                            steps.append(
+                                SetFloatingStep(
+                                    id=next_id("float"),
+                                    window_id=wid,
+                                    description=f"set {ar.app_name} floating",
+                                    app_name=ar.app_name,
+                                    workspace_name=wr.name,
+                                )
+                            )
+                        else:
+                            steps.append(
+                                SetTilingStep(
+                                    id=next_id("tile"),
+                                    window_id=wid,
+                                    description=f"set {ar.app_name} tiling",
+                                    app_name=ar.app_name,
+                                    workspace_name=wr.name,
+                                )
+                            )
+                    elif d.kind == DriftKind.WRONG_FULLSCREEN:
                         steps.append(
-                            PlanStep(
-                                id=new_id("move"),
-                                kind=StepKind.MOVE_WINDOW_TO_WORKSPACE,
-                                app_name=app.app_name,
-                                workspace_name=app.workspace_name,
-                                window_id=app.match_decision.best,
-                                description=f"Move '{app.app_name}' to workspace '{app.workspace_name}'",
+                            SetFullscreenStep(
+                                id=next_id("fs"),
+                                window_id=wid,
+                                fullscreen=napp.placement.fullscreen,
+                                description=f"set {ar.app_name} fullscreen={napp.placement.fullscreen}",
+                                app_name=ar.app_name,
+                                workspace_name=wr.name,
                             )
                         )
-                    if drift.kind == DriftKind.WRONG_FLOATING:
-                        kind = StepKind.SET_FLOATING if drift.desired == "True" else StepKind.SET_TILING
+                    elif d.kind == DriftKind.WRONG_MAXIMIZED:
                         steps.append(
-                            PlanStep(
-                                id=new_id("float"),
-                                kind=kind,
-                                app_name=app.app_name,
-                                workspace_name=app.workspace_name,
-                                window_id=app.match_decision.best,
-                                description=f"Set floating for '{app.app_name}' to {drift.desired}",
-                            )
-                        )
-                    if drift.kind == DriftKind.WRONG_FULLSCREEN:
-                        kind = (
-                            StepKind.SET_FULLSCREEN
-                            if drift.desired == "True"
-                            else StepKind.UNSET_FULLSCREEN
-                        )
-                        steps.append(
-                            PlanStep(
-                                id=new_id("fs"),
-                                kind=kind,
-                                app_name=app.app_name,
-                                workspace_name=app.workspace_name,
-                                window_id=app.match_decision.best,
-                                description=f"Set fullscreen for '{app.app_name}' to {drift.desired}",
-                            )
-                        )
-                    if drift.kind == DriftKind.WRONG_MAXIMIZED:
-                        kind = (
-                            StepKind.SET_MAXIMIZED
-                            if drift.desired == "True"
-                            else StepKind.UNSET_MAXIMIZED
-                        )
-                        steps.append(
-                            PlanStep(
-                                id=new_id("max"),
-                                kind=kind,
-                                app_name=app.app_name,
-                                workspace_name=app.workspace_name,
-                                window_id=app.match_decision.best,
-                                description=f"Set maximized for '{app.app_name}' to {drift.desired}",
+                            SetMaximizedStep(
+                                id=next_id("max"),
+                                window_id=wid,
+                                maximized=napp.placement.maximized,
+                                description=f"set {ar.app_name} maximized={napp.placement.maximized}",
+                                app_name=ar.app_name,
+                                workspace_name=wr.name,
                             )
                         )
 
-    return Plan(
-        session_name=resolution.session_name,
-        steps=topological_sort(steps),
-        resolution=resolution,
-        warnings=warnings,
-    )
+            if wid is not None and napp.placement.column_width is not None:
+                prop, px = _parse_size(napp.placement.column_width)
+                steps.append(
+                    SetColumnWidthStep(
+                        id=next_id("cw"),
+                        window_id=wid,
+                        proportion=prop,
+                        pixels=px,
+                        description=f"set column width for {ar.app_name}",
+                        app_name=ar.app_name,
+                        workspace_name=wr.name,
+                    )
+                )
+
+            if wid is not None and napp.placement.window_height is not None:
+                prop, px = _parse_size(napp.placement.window_height)
+                steps.append(
+                    SetWindowHeightStep(
+                        id=next_id("wh"),
+                        window_id=wid,
+                        proportion=prop,
+                        pixels=px,
+                        description=f"set window height for {ar.app_name}",
+                        app_name=ar.app_name,
+                        workspace_name=wr.name,
+                    )
+                )
+
+            if wid is not None and napp.placement.focus:
+                steps.append(
+                    FocusWindowStep(
+                        id=next_id("focus"),
+                        window_id=wid,
+                        description=f"focus {ar.app_name}",
+                        app_name=ar.app_name,
+                        workspace_name=wr.name,
+                    )
+                )
+
+    for nws in normalized.workspaces:
+        if nws.focus:
+            steps.append(
+                FocusWorkspaceStep(
+                    id=next_id("focus-ws"),
+                    description=f"focus workspace '{nws.name}'",
+                    workspace_name=nws.name,
+                )
+            )
+
+    steps = topological_sort(steps)
+
+    return Plan(session_name=resolution.session_name, steps=steps, resolution=resolution)
+
+
+def _parse_size(value: float | str) -> tuple[float | None, int | None]:
+    """Parse column_width / window_height from spec format."""
+    if isinstance(value, (int, float)):
+        return (float(value), None)
+    if isinstance(value, str) and value.startswith("px:"):
+        return (None, int(value[3:]))
+    return (float(value), None)
 
 
 def compile_diff(resolution: Resolution) -> SessionDiff:
-    """Create a human-readable diff from resolution."""
-
+    """Human-readable diff from resolution."""
     diff = SessionDiff(session_name=resolution.session_name, warnings=list(resolution.warnings))
-    for ws in resolution.workspace_resolutions:
-        if not ws.exists:
-            diff.workspace_changes.append(f"{ws.name}: create workspace")
-        if ws.desired_output and not ws.output_correct:
-            diff.workspace_changes.append(f"{ws.name}: move to output {ws.desired_output}")
 
-        for app in ws.app_resolutions:
-            if app.status == ResolutionStatus.MATCHED:
-                if app.match_decision.best is not None:
-                    diff.already_matched.append(
-                        f"{app.app_name}: matched window {app.match_decision.best}"
-                    )
-            elif app.status == ResolutionStatus.MISSING:
-                diff.will_spawn.append(f"{app.app_name}: will spawn")
-            elif app.status == ResolutionStatus.OPTIONAL_MISSING:
-                diff.warnings.append(f"{app.app_name}: no match found (optional)")
-            elif app.status == ResolutionStatus.AMBIGUOUS:
-                diff.errors.append(f"{app.app_name}: ambiguous match")
-            elif app.status == ResolutionStatus.DRIFTED:
-                for drift in app.drift:
-                    if drift.kind == DriftKind.WRONG_WORKSPACE:
-                        diff.will_move.append(f"{app.app_name}: move to {app.workspace_name}")
-                    else:
-                        diff.will_adjust.append(f"{app.app_name}: {drift.kind.value}")
+    for wr in resolution.workspace_resolutions:
+        if not wr.exists:
+            diff.workspace_changes.append(f"workspace '{wr.name}' will be created")
+        elif wr.desired_output and not wr.output_correct:
+            diff.workspace_changes.append(
+                f"workspace '{wr.name}' will move output {wr.current_output} -> {wr.desired_output}"
+            )
+
+        for ar in wr.app_resolutions:
+            label = f"{wr.name}/{ar.app_name}"
+            if ar.status == ResolutionStatus.MATCHED:
+                diff.already_matched.append(label)
+            elif ar.status == ResolutionStatus.MISSING:
+                diff.will_spawn.append(label)
+            elif ar.status == ResolutionStatus.DRIFTED:
+                if ar.needs_move:
+                    diff.will_move.append(label)
+                if any(d.kind != DriftKind.WRONG_WORKSPACE for d in ar.drift):
+                    diff.will_adjust.append(label)
+            elif ar.status == ResolutionStatus.AMBIGUOUS:
+                diff.errors.append(f"ambiguous match: {label}")
+
     return diff

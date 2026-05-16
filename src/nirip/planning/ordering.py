@@ -38,5 +38,5 @@ def topological_sort(steps: list[PlanStep]) -> list[PlanStep]:
     if len(ordered) != len(steps):
         ordered_ids = {step.id for step in ordered}
         cycle_ids = [step.id for step in steps if step.id not in ordered_ids]
-        raise CycleError(f"Dependency cycle detected among steps: {cycle_ids}")
+        raise CycleError(cycle_ids)
     return ordered

@@ -1,46 +1,118 @@
 """Planning models."""
+
 from __future__ import annotations
 
-from enum import StrEnum
-from typing import Any
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, computed_field
+from pydantic import Discriminator, Field, computed_field
 
+from nirip._base import NiripModel
 from nirip.resolve.models import Resolution
+from nirip.spec.models import MatchRule
 
 
-class StepKind(StrEnum):
-    ENSURE_WORKSPACE = "ensure_workspace"
-    MOVE_WORKSPACE_TO_OUTPUT = "move_workspace_to_output"
-    SPAWN_WINDOW = "spawn_window"
-    WAIT_FOR_WINDOW = "wait_for_window"
-    MOVE_WINDOW_TO_WORKSPACE = "move_window_to_workspace"
-    SET_FLOATING = "set_floating"
-    SET_TILING = "set_tiling"
-    SET_FULLSCREEN = "set_fullscreen"
-    UNSET_FULLSCREEN = "unset_fullscreen"
-    SET_MAXIMIZED = "set_maximized"
-    UNSET_MAXIMIZED = "unset_maximized"
-    FOCUS_WINDOW = "focus_window"
-    FOCUS_WORKSPACE = "focus_workspace"
-
-
-class PlanStep(BaseModel):
-    """Single imperative step."""
-
+class StepBase(NiripModel):
     id: str
-    kind: StepKind
-    app_name: str | None = None
-    workspace_name: str | None = None
-    window_id: int | None = None
     description: str
     depends_on: list[str] = Field(default_factory=list)
-    metadata: dict[str, Any] = Field(default_factory=dict)
+    app_name: str | None = None
+    workspace_name: str | None = None
 
 
-class Plan(BaseModel):
-    """Compiled execution plan."""
+class EnsureWorkspaceStep(StepBase):
+    kind: Literal["ensure_workspace"] = "ensure_workspace"
+    target_output: str | None = None
 
+
+class MoveWorkspaceToOutputStep(StepBase):
+    kind: Literal["move_workspace_to_output"] = "move_workspace_to_output"
+    target_output: str
+
+
+class SpawnWindowStep(StepBase):
+    kind: Literal["spawn_window"] = "spawn_window"
+    command: list[str] | str
+    cwd: str | None = None
+    env: dict[str, str] = Field(default_factory=dict)
+    shell: bool = False
+
+
+class WaitForWindowStep(StepBase):
+    kind: Literal["wait_for_window"] = "wait_for_window"
+    match: MatchRule
+    timeout_s: float
+
+
+class MoveWindowToWorkspaceStep(StepBase):
+    kind: Literal["move_window_to_workspace"] = "move_window_to_workspace"
+    window_id: int
+    target_workspace: str
+
+
+class SetFloatingStep(StepBase):
+    kind: Literal["set_floating"] = "set_floating"
+    window_id: int
+
+
+class SetTilingStep(StepBase):
+    kind: Literal["set_tiling"] = "set_tiling"
+    window_id: int
+
+
+class SetFullscreenStep(StepBase):
+    kind: Literal["set_fullscreen"] = "set_fullscreen"
+    window_id: int
+    fullscreen: bool
+
+
+class SetMaximizedStep(StepBase):
+    kind: Literal["set_maximized"] = "set_maximized"
+    window_id: int
+    maximized: bool
+
+
+class SetColumnWidthStep(StepBase):
+    kind: Literal["set_column_width"] = "set_column_width"
+    window_id: int
+    proportion: float | None = None
+    pixels: int | None = None
+
+
+class SetWindowHeightStep(StepBase):
+    kind: Literal["set_window_height"] = "set_window_height"
+    window_id: int
+    proportion: float | None = None
+    pixels: int | None = None
+
+
+class FocusWindowStep(StepBase):
+    kind: Literal["focus_window"] = "focus_window"
+    window_id: int
+
+
+class FocusWorkspaceStep(StepBase):
+    kind: Literal["focus_workspace"] = "focus_workspace"
+
+
+PlanStep = Annotated[
+    EnsureWorkspaceStep
+    | MoveWorkspaceToOutputStep
+    | SpawnWindowStep
+    | WaitForWindowStep
+    | MoveWindowToWorkspaceStep
+    | SetFloatingStep
+    | SetTilingStep
+    | SetFullscreenStep
+    | SetMaximizedStep
+    | SetColumnWidthStep
+    | SetWindowHeightStep
+    | FocusWindowStep
+    | FocusWorkspaceStep,
+    Discriminator("kind"),
+]
+
+
+class Plan(NiripModel):
     session_name: str
     steps: list[PlanStep]
     resolution: Resolution
@@ -49,7 +121,7 @@ class Plan(BaseModel):
     @computed_field
     @property
     def requires_spawn(self) -> bool:
-        return any(s.kind == StepKind.SPAWN_WINDOW for s in self.steps)
+        return any(s.kind == "spawn_window" for s in self.steps)
 
     @computed_field
     @property
@@ -62,9 +134,7 @@ class Plan(BaseModel):
         return len(self.steps) == 0
 
 
-class SessionDiff(BaseModel):
-    """Human-readable diff between desired and current state."""
-
+class SessionDiff(NiripModel):
     session_name: str
     already_matched: list[str] = Field(default_factory=list)
     will_spawn: list[str] = Field(default_factory=list)
