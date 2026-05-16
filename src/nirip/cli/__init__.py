@@ -1,4 +1,4 @@
-"""CLI package."""
+"""CLI exports."""
 
 from nirip.cli.main import main
 
