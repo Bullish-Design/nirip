@@ -48,6 +48,15 @@ async def _wait(state: NiriState, predicate: Callable[[Snapshot], bool], timeout
     return await wait_until(state, predicate, config=_WAIT_CONFIG, timeout=timeout)
 
 
+def _resolve_window_id(step: PlanStep, runtime: SessionRuntime) -> int | None:
+    wid = getattr(step, "window_id", None)
+    if wid is not None:
+        return wid
+    if step.app_name and step.app_name in runtime.apps:
+        return runtime.apps[step.app_name].matched_window_id
+    return None
+
+
 async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRuntime) -> StepResult:
     t0 = time.monotonic()
     if is_already_satisfied(step, ports.state.snapshot):
@@ -90,51 +99,69 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                 await _wait(ports.state, predicate, step.timeout_s)
                 return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="window appeared")
             case MoveWindowToWorkspaceStep():
+                wid = _resolve_window_id(step, runtime)
+                if wid is None:
+                    return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
                 workspace_ref = actions.workspace_by_name(step.target_workspace)
                 await _request(
                     ports.client,
-                    actions.move_window_to_workspace(workspace_ref, window_id=step.window_id),
+                    actions.move_window_to_workspace(workspace_ref, window_id=wid),
                 )
                 return StepResult(
                     step=step,
                     outcome=StepOutcome.COMPLETED,
                     message="window moved",
-                    window_id=step.window_id,
+                    window_id=wid,
                 )
             case SetFloatingStep():
-                await _request(ports.client, actions.move_window_to_floating(step.window_id))
+                wid = _resolve_window_id(step, runtime)
+                if wid is None:
+                    return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
+                await _request(ports.client, actions.move_window_to_floating(wid))
                 return StepResult(
                     step=step,
                     outcome=StepOutcome.COMPLETED,
                     message="window set floating",
-                    window_id=step.window_id,
+                    window_id=wid,
                 )
             case SetTilingStep():
-                await _request(ports.client, actions.move_window_to_tiling(step.window_id))
+                wid = _resolve_window_id(step, runtime)
+                if wid is None:
+                    return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
+                await _request(ports.client, actions.move_window_to_tiling(wid))
                 return StepResult(
                     step=step,
                     outcome=StepOutcome.COMPLETED,
                     message="window set tiling",
-                    window_id=step.window_id,
+                    window_id=wid,
                 )
             case SetFullscreenStep():
-                await _request(ports.client, actions.fullscreen_window(step.window_id))
+                wid = _resolve_window_id(step, runtime)
+                if wid is None:
+                    return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
+                await _request(ports.client, actions.fullscreen_window(wid))
                 return StepResult(
                     step=step,
                     outcome=StepOutcome.COMPLETED,
                     message="fullscreen toggled",
-                    window_id=step.window_id,
+                    window_id=wid,
                 )
             case SetMaximizedStep():
-                await _request(ports.client, actions.maximize_window_to_edges(step.window_id))
+                wid = _resolve_window_id(step, runtime)
+                if wid is None:
+                    return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
+                await _request(ports.client, actions.maximize_window_to_edges(wid))
                 return StepResult(
                     step=step,
                     outcome=StepOutcome.COMPLETED,
                     message="maximized toggled",
-                    window_id=step.window_id,
+                    window_id=wid,
                 )
             case SetColumnWidthStep():
-                await _request(ports.client, actions.focus_window(step.window_id))
+                wid = _resolve_window_id(step, runtime)
+                if wid is None:
+                    return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
+                await _request(ports.client, actions.focus_window(wid))
                 change = (
                     actions.size_set_proportion(step.proportion)
                     if step.proportion is not None
@@ -145,28 +172,34 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                     step=step,
                     outcome=StepOutcome.COMPLETED,
                     message="column width set",
-                    window_id=step.window_id,
+                    window_id=wid,
                 )
             case SetWindowHeightStep():
+                wid = _resolve_window_id(step, runtime)
+                if wid is None:
+                    return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
                 change = (
                     actions.size_set_proportion(step.proportion)
                     if step.proportion is not None
                     else actions.size_set_fixed(step.pixels or 0)
                 )
-                await _request(ports.client, actions.set_window_height(change, step.window_id))
+                await _request(ports.client, actions.set_window_height(change, wid))
                 return StepResult(
                     step=step,
                     outcome=StepOutcome.COMPLETED,
                     message="window height set",
-                    window_id=step.window_id,
+                    window_id=wid,
                 )
             case FocusWindowStep():
-                await _request(ports.client, actions.focus_window(step.window_id))
+                wid = _resolve_window_id(step, runtime)
+                if wid is None:
+                    return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
+                await _request(ports.client, actions.focus_window(wid))
                 return StepResult(
                     step=step,
                     outcome=StepOutcome.COMPLETED,
                     message="window focused",
-                    window_id=step.window_id,
+                    window_id=wid,
                 )
             case FocusWorkspaceStep():
                 await _request(ports.client, actions.focus_workspace(step.workspace_name or ""))

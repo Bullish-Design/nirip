@@ -45,49 +45,49 @@ class WaitForWindowStep(StepBase):
 
 class MoveWindowToWorkspaceStep(StepBase):
     kind: Literal["move_window_to_workspace"] = "move_window_to_workspace"
-    window_id: int
+    window_id: int | None = None
     target_workspace: str
 
 
 class SetFloatingStep(StepBase):
     kind: Literal["set_floating"] = "set_floating"
-    window_id: int
+    window_id: int | None = None
 
 
 class SetTilingStep(StepBase):
     kind: Literal["set_tiling"] = "set_tiling"
-    window_id: int
+    window_id: int | None = None
 
 
 class SetFullscreenStep(StepBase):
     kind: Literal["set_fullscreen"] = "set_fullscreen"
-    window_id: int
+    window_id: int | None = None
     fullscreen: bool
 
 
 class SetMaximizedStep(StepBase):
     kind: Literal["set_maximized"] = "set_maximized"
-    window_id: int
+    window_id: int | None = None
     maximized: bool
 
 
 class SetColumnWidthStep(StepBase):
     kind: Literal["set_column_width"] = "set_column_width"
-    window_id: int
+    window_id: int | None = None
     proportion: float | None = None
     pixels: int | None = None
 
 
 class SetWindowHeightStep(StepBase):
     kind: Literal["set_window_height"] = "set_window_height"
-    window_id: int
+    window_id: int | None = None
     proportion: float | None = None
     pixels: int | None = None
 
 
 class FocusWindowStep(StepBase):
     kind: Literal["focus_window"] = "focus_window"
-    window_id: int
+    window_id: int | None = None
 
 
 class FocusWorkspaceStep(StepBase):

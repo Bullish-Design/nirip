@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from nirip.planning.models import (
     EnsureWorkspaceStep,
     FocusWindowStep,
@@ -22,7 +24,7 @@ from nirip.planning.models import (
 )
 from nirip.planning.ordering import topological_sort
 from nirip.errors import PlanningError
-from nirip.resolve.models import DriftKind, NormalizedSession, Resolution, ResolutionStatus
+from nirip.resolve.models import AppResolution, DriftKind, NormalizedApp, NormalizedSession, Resolution, ResolutionStatus
 
 
 def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
@@ -36,7 +38,7 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
         return f"{prefix}-{step_counter}"
 
     for wr in resolution.workspace_resolutions:
-        ensure_id = None
+        ensure_id: str | None = None
 
         if not wr.exists:
             ensure_id = next_id("ensure-ws")
@@ -59,11 +61,17 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
             )
 
         for ar in wr.app_resolutions:
+            if not ar.action_required:
+                continue
+
             napp = normalized.app_index[f"{wr.name}/{ar.app_name}"]
-            deps = [ensure_id] if ensure_id else []
+            base_deps = [ensure_id] if ensure_id else []
+            placement_deps = list(base_deps)
+            wid = ar.match_decision.assigned_window_id
 
             if ar.needs_spawn and napp.spawn:
                 spawn_id = next_id("spawn")
+                wait_id = next_id("wait")
                 steps.append(
                     SpawnWindowStep(
                         id=spawn_id,
@@ -74,12 +82,12 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                         cwd=napp.spawn.cwd,
                         env=napp.spawn.env,
                         shell=napp.spawn.shell,
-                        depends_on=deps,
+                        depends_on=base_deps,
                     )
                 )
                 steps.append(
                     WaitForWindowStep(
-                        id=next_id("wait"),
+                        id=wait_id,
                         description=f"wait for {ar.app_name}",
                         app_name=ar.app_name,
                         workspace_name=wr.name,
@@ -88,10 +96,9 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                         depends_on=[spawn_id],
                     )
                 )
+                placement_deps = [wait_id]
 
-            wid = ar.match_decision.assigned_window_id
-
-            if ar.needs_move and wid is not None:
+            if ar.needs_move or ar.needs_spawn:
                 steps.append(
                     MoveWindowToWorkspaceStep(
                         id=next_id("move"),
@@ -100,57 +107,41 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                         workspace_name=wr.name,
                         window_id=wid,
                         target_workspace=wr.name,
-                        depends_on=deps,
+                        depends_on=placement_deps,
                     )
                 )
 
-            if wid is not None:
-                for d in ar.drift:
-                    if d.kind == DriftKind.WRONG_FLOATING:
-                        if napp.placement.floating:
-                            steps.append(
-                                SetFloatingStep(
-                                    id=next_id("float"),
-                                    window_id=wid,
-                                    description=f"set {ar.app_name} floating",
-                                    app_name=ar.app_name,
-                                    workspace_name=wr.name,
-                                )
-                            )
-                        else:
-                            steps.append(
-                                SetTilingStep(
-                                    id=next_id("tile"),
-                                    window_id=wid,
-                                    description=f"set {ar.app_name} tiling",
-                                    app_name=ar.app_name,
-                                    workspace_name=wr.name,
-                                )
-                            )
-                    elif d.kind == DriftKind.WRONG_FULLSCREEN:
-                        steps.append(
-                            SetFullscreenStep(
-                                id=next_id("fs"),
-                                window_id=wid,
-                                fullscreen=napp.placement.fullscreen,
-                                description=f"set {ar.app_name} fullscreen={napp.placement.fullscreen}",
-                                app_name=ar.app_name,
-                                workspace_name=wr.name,
-                            )
-                        )
-                    elif d.kind == DriftKind.WRONG_MAXIMIZED:
-                        steps.append(
-                            SetMaximizedStep(
-                                id=next_id("max"),
-                                window_id=wid,
-                                maximized=napp.placement.maximized,
-                                description=f"set {ar.app_name} maximized={napp.placement.maximized}",
-                                app_name=ar.app_name,
-                                workspace_name=wr.name,
-                            )
-                        )
+            _emit_float_tiling(steps, next_id, ar, napp, wr.name, wid, placement_deps)
 
-            if wid is not None and napp.placement.column_width is not None:
+            if ar.needs_spawn or any(d.kind == DriftKind.WRONG_FULLSCREEN for d in ar.drift):
+                if napp.placement.fullscreen:
+                    steps.append(
+                        SetFullscreenStep(
+                            id=next_id("fs"),
+                            window_id=wid,
+                            fullscreen=True,
+                            description=f"set {ar.app_name} fullscreen",
+                            app_name=ar.app_name,
+                            workspace_name=wr.name,
+                            depends_on=placement_deps,
+                        )
+                    )
+
+            if ar.needs_spawn or any(d.kind == DriftKind.WRONG_MAXIMIZED for d in ar.drift):
+                if napp.placement.maximized:
+                    steps.append(
+                        SetMaximizedStep(
+                            id=next_id("max"),
+                            window_id=wid,
+                            maximized=True,
+                            description=f"set {ar.app_name} maximized",
+                            app_name=ar.app_name,
+                            workspace_name=wr.name,
+                            depends_on=placement_deps,
+                        )
+                    )
+
+            if napp.placement.column_width is not None:
                 prop, px = _parse_size(napp.placement.column_width)
                 steps.append(
                     SetColumnWidthStep(
@@ -161,10 +152,11 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                         description=f"set column width for {ar.app_name}",
                         app_name=ar.app_name,
                         workspace_name=wr.name,
+                        depends_on=placement_deps,
                     )
                 )
 
-            if wid is not None and napp.placement.window_height is not None:
+            if napp.placement.window_height is not None:
                 prop, px = _parse_size(napp.placement.window_height)
                 steps.append(
                     SetWindowHeightStep(
@@ -175,10 +167,11 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                         description=f"set window height for {ar.app_name}",
                         app_name=ar.app_name,
                         workspace_name=wr.name,
+                        depends_on=placement_deps,
                     )
                 )
 
-            if wid is not None and napp.placement.focus:
+            if napp.placement.focus:
                 steps.append(
                     FocusWindowStep(
                         id=next_id("focus"),
@@ -186,6 +179,7 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                         description=f"focus {ar.app_name}",
                         app_name=ar.app_name,
                         workspace_name=wr.name,
+                        depends_on=placement_deps,
                     )
                 )
 
@@ -202,6 +196,42 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
     steps = topological_sort(steps)
 
     return Plan(session_name=resolution.session_name, steps=steps, resolution=resolution)
+
+
+def _emit_float_tiling(
+    steps: list[PlanStep],
+    next_id: Callable[[str], str],
+    ar: AppResolution,
+    napp: NormalizedApp,
+    ws_name: str,
+    wid: int | None,
+    deps: list[str],
+) -> None:
+    needs_it = ar.needs_spawn or any(d.kind == DriftKind.WRONG_FLOATING for d in ar.drift)
+    if not needs_it:
+        return
+    if napp.placement.floating:
+        steps.append(
+            SetFloatingStep(
+                id=next_id("float"),
+                window_id=wid,
+                description=f"set {ar.app_name} floating",
+                app_name=ar.app_name,
+                workspace_name=ws_name,
+                depends_on=deps,
+            )
+        )
+    else:
+        steps.append(
+            SetTilingStep(
+                id=next_id("tile"),
+                window_id=wid,
+                description=f"set {ar.app_name} tiling",
+                app_name=ar.app_name,
+                workspace_name=ws_name,
+                depends_on=deps,
+            )
+        )
 
 
 def _parse_size(value: float | str) -> tuple[float | None, int | None]:
