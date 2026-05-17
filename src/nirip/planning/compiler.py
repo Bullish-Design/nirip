@@ -42,6 +42,7 @@ def _should_act(ar: AppResolution, options: SessionOptions) -> bool:
             return True
         case ResolutionStatus.AMBIGUOUS:
             return False
+        case _: raise ValueError(f"unhandled status: {ar.status}")
 
 
 def compile_plan(resolution: Resolution, options: SessionOptions) -> Plan:
