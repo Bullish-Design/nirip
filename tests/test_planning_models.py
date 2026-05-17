@@ -1,11 +1,11 @@
-from nirip.planning.models import EnsureWorkspaceStep, MoveWindowToWorkspaceStep
+from nirip.planning.models import CreateWorkspaceStep, MoveWindowToWorkspaceStep
 
 
 def test_plan_step_discriminator_roundtrip() -> None:
-    step = EnsureWorkspaceStep(id="1", description="d", workspace_name="w")
+    step = CreateWorkspaceStep(id="1", description="d", workspace_name="w")
     data = step.model_dump()
-    parsed = EnsureWorkspaceStep.model_validate(data)
-    assert parsed.kind == "ensure_workspace"
+    parsed = CreateWorkspaceStep.model_validate(data)
+    assert parsed.kind == "create_workspace"
 
 
 def test_typed_fields_present() -> None:

@@ -20,8 +20,8 @@ class StepBase(NiripModel):
     workspace_name: str | None = None
 
 
-class EnsureWorkspaceStep(StepBase):
-    kind: Literal["ensure_workspace"] = "ensure_workspace"
+class CreateWorkspaceStep(StepBase):
+    kind: Literal["create_workspace"] = "create_workspace"
     target_output: str | None = None
 
 
@@ -87,7 +87,7 @@ class FocusWorkspaceStep(StepBase):
 
 
 PlanStep = Annotated[
-    EnsureWorkspaceStep
+    CreateWorkspaceStep
     | MoveWorkspaceToOutputStep
     | SpawnWindowStep
     | WaitForWindowStep
@@ -127,7 +127,7 @@ class SessionDiff(NiripModel):
     already_matched: list[str] = Field(default_factory=list)
     will_spawn: list[str] = Field(default_factory=list)
     will_move: list[str] = Field(default_factory=list)
-    will_adjust: list[str] = Field(default_factory=list)
+    drifted: list[str] = Field(default_factory=list)
     workspace_changes: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
@@ -135,7 +135,7 @@ class SessionDiff(NiripModel):
     @computed_field
     @property
     def has_drift(self) -> bool:
-        return bool(self.will_spawn or self.will_move or self.will_adjust or self.workspace_changes)
+        return bool(self.will_spawn or self.will_move or self.drifted or self.workspace_changes)
 
     @computed_field
     @property

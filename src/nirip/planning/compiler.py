@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from nirip.errors import PlanningError
 from nirip.planning.models import (
-    EnsureWorkspaceStep,
+    CreateWorkspaceStep,
     FocusWindowStep,
     FocusWorkspaceStep,
     MoveWindowToWorkspaceStep,
@@ -44,9 +44,9 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
         ensure_id: str | None = None
 
         if not wr.exists:
-            ensure_id = next_id("ensure-ws")
+            ensure_id = next_id("create-ws")
             steps.append(
-                EnsureWorkspaceStep(
+                CreateWorkspaceStep(
                     id=ensure_id,
                     description=f"create workspace '{wr.name}'",
                     workspace_name=wr.name,
@@ -288,7 +288,7 @@ def compile_diff(resolution: Resolution) -> SessionDiff:
                 if ar.needs_move:
                     diff.will_move.append(label)
                 if any(d.kind != DriftKind.WRONG_WORKSPACE for d in ar.drift):
-                    diff.will_adjust.append(label)
+                    diff.drifted.append(label)
             elif ar.status == ResolutionStatus.AMBIGUOUS:
                 diff.errors.append(f"ambiguous match: {label}")
 

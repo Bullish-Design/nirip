@@ -5,7 +5,7 @@ from __future__ import annotations
 from niri_state import Snapshot
 
 from nirip.planning.models import (
-    EnsureWorkspaceStep,
+    CreateWorkspaceStep,
     MoveWindowToWorkspaceStep,
     PlanStep,
     SetWindowStateStep,
@@ -22,7 +22,7 @@ _STATE_CHECKS = {
 
 def is_already_satisfied(step: PlanStep, snapshot: Snapshot) -> bool:
     match step:
-        case EnsureWorkspaceStep():
+        case CreateWorkspaceStep():
             return any(ws.name == step.workspace_name for ws in snapshot.workspaces.values())
         case MoveWindowToWorkspaceStep():
             if step.window_id is None:

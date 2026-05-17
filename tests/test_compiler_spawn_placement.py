@@ -32,7 +32,7 @@ def _make_resolution(status: ResolutionStatus, wid: int | None = None) -> tuple[
         assigned_window_id=wid,
         candidates=[],
         confidence=0.0 if wid is None else 1.0,
-        rationale=["test"],
+        reasons=["test"],
     )
     ar = AppResolution(
         app_name="myapp",

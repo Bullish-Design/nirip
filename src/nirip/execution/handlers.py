@@ -16,7 +16,7 @@ from nirip.execution.models import SessionPorts, StepOutcome, StepResult
 from nirip.execution.predicates import is_already_satisfied
 from nirip.execution.runtime import SessionRuntime
 from nirip.planning.models import (
-    EnsureWorkspaceStep,
+    CreateWorkspaceStep,
     FocusWindowStep,
     FocusWorkspaceStep,
     MoveWindowToWorkspaceStep,
@@ -73,7 +73,7 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
         return StepResult(step=step, outcome=StepOutcome.SKIPPED, message="already satisfied")
 
     match step:
-        case EnsureWorkspaceStep():
+        case CreateWorkspaceStep():
             await _request(ports.client, actions.focus_workspace(step.workspace_name or ""))
             await _wait(
                 ports.state,

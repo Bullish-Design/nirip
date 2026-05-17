@@ -49,7 +49,7 @@ class MatchDecision(NiripModel):
     assigned_window_id: int | None = None
     candidates: list[MatchCandidate]
     confidence: float = 0.0
-    rationale: list[str]
+    reasons: list[str]
 
     @computed_field
     @property

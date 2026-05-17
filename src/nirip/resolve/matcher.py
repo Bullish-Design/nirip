@@ -119,15 +119,15 @@ def assign_windows(apps: list[NormalizedApp], windows: Iterable[Window]) -> list
         candidates = all_candidates[app_idx]
         wid = app_to_window.get(app_idx)
         conf = 0.0
-        rationale: list[str] = []
+        reasons: list[str] = []
 
         if wid is not None:
             conf = next(c.confidence for c in candidates if c.window_id == wid)
-            rationale.append(f"assigned window {wid} (confidence {conf:.2f})")
+            reasons.append(f"assigned window {wid} (confidence {conf:.2f})")
         elif candidates:
-            rationale.append(f"{len(candidates)} candidate(s) all claimed by higher-confidence matches")
+            reasons.append(f"{len(candidates)} candidate(s) all claimed by higher-confidence matches")
         else:
-            rationale.append("no matching windows found")
+            reasons.append("no matching windows found")
 
         decisions.append(
             MatchDecision(
@@ -136,7 +136,7 @@ def assign_windows(apps: list[NormalizedApp], windows: Iterable[Window]) -> list
                 assigned_window_id=wid,
                 candidates=candidates,
                 confidence=conf,
-                rationale=rationale,
+                reasons=reasons,
             )
         )
 

@@ -21,9 +21,9 @@ def format_diff(diff: SessionDiff) -> str:
         lines.append("Will move:")
         for app in diff.will_move:
             lines.append(f"  ~ {app}")
-    if diff.will_adjust:
-        lines.append("Will adjust:")
-        for app in diff.will_adjust:
+    if diff.drifted:
+        lines.append("Drifted:")
+        for app in diff.drifted:
             lines.append(f"  * {app}")
     if diff.workspace_changes:
         lines.append("Workspace changes:")

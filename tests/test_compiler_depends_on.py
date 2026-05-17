@@ -47,7 +47,7 @@ def test_depends_on_enforces_ordering() -> None:
                 assigned_window_id=None,
                 candidates=[],
                 confidence=0.0,
-                rationale=["test"],
+                reasons=["test"],
             ),
             drift=[],
             action_required=True,
