@@ -5,10 +5,12 @@ from __future__ import annotations
 import asyncio
 import os
 import time
+from collections.abc import Callable
 from typing import Any
 
 from niri_pypc import actions
-from niri_state import WaitTimeoutError
+from niri_state import NiriState, Snapshot, WaitTimeoutError
+from niri_state.api.config import NiriStateConfig
 from niri_state.api.waiters import wait_until
 
 from nirip.execution.models import SessionPorts, StepOutcome, StepResult
@@ -39,11 +41,11 @@ async def _request(client: Any, req: Any) -> None:
         await resp
 
 
-async def _wait(state: Any, predicate: Any, timeout: float) -> Any:
-    try:
-        return await wait_until(state, predicate, timeout=timeout)
-    except TypeError:
-        return await wait_until(state, predicate, config=None, timeout=timeout)
+_WAIT_CONFIG = NiriStateConfig()
+
+
+async def _wait(state: NiriState, predicate: Callable[[Snapshot], bool], timeout: float) -> Snapshot:
+    return await wait_until(state, predicate, config=_WAIT_CONFIG, timeout=timeout)
 
 
 async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRuntime) -> StepResult:
