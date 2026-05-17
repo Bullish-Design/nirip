@@ -21,6 +21,7 @@ from nirip.planning.models import (
     WaitForWindowStep,
 )
 from nirip.planning.ordering import topological_sort
+from nirip.errors import PlanningError
 from nirip.resolve.models import DriftKind, NormalizedSession, Resolution, ResolutionStatus
 
 
@@ -204,12 +205,20 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
 
 
 def _parse_size(value: float | str) -> tuple[float | None, int | None]:
-    """Parse column_width / window_height from spec format."""
+    """Parse size value: float proportion or "px:<integer>" fixed pixels."""
     if isinstance(value, (int, float)):
         return (float(value), None)
-    if isinstance(value, str) and value.startswith("px:"):
-        return (None, int(value[3:]))
-    return (float(value), None)
+    if isinstance(value, str):
+        if value.startswith("px:"):
+            try:
+                return (None, int(value[3:]))
+            except ValueError as e:
+                raise PlanningError(f"invalid pixel size: {value!r} — expected 'px:<integer>'") from e
+        try:
+            return (float(value), None)
+        except ValueError as e:
+            raise PlanningError(f"invalid size value: {value!r}") from e
+    raise PlanningError(f"unexpected size type: {type(value).__name__}")
 
 
 def compile_diff(resolution: Resolution) -> SessionDiff:
