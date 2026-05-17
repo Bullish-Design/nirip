@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from typing import Annotated, Literal
 
 from pydantic import Discriminator, Field, computed_field
@@ -49,38 +50,29 @@ class MoveWindowToWorkspaceStep(StepBase):
     target_workspace: str
 
 
-class SetFloatingStep(StepBase):
-    kind: Literal["set_floating"] = "set_floating"
+class WindowProperty(StrEnum):
+    FLOATING = "floating"
+    TILING = "tiling"
+    FULLSCREEN = "fullscreen"
+    MAXIMIZED = "maximized"
+
+
+class SetWindowStateStep(StepBase):
+    kind: Literal["set_window_state"] = "set_window_state"
     window_id: int | None = None
+    property: WindowProperty
+    value: bool = True
 
 
-class SetTilingStep(StepBase):
-    kind: Literal["set_tiling"] = "set_tiling"
+class ResizeAxis(StrEnum):
+    WIDTH = "width"
+    HEIGHT = "height"
+
+
+class ResizeWindowStep(StepBase):
+    kind: Literal["resize_window"] = "resize_window"
     window_id: int | None = None
-
-
-class SetFullscreenStep(StepBase):
-    kind: Literal["set_fullscreen"] = "set_fullscreen"
-    window_id: int | None = None
-    fullscreen: bool
-
-
-class SetMaximizedStep(StepBase):
-    kind: Literal["set_maximized"] = "set_maximized"
-    window_id: int | None = None
-    maximized: bool
-
-
-class SetColumnWidthStep(StepBase):
-    kind: Literal["set_column_width"] = "set_column_width"
-    window_id: int | None = None
-    proportion: float | None = None
-    pixels: int | None = None
-
-
-class SetWindowHeightStep(StepBase):
-    kind: Literal["set_window_height"] = "set_window_height"
-    window_id: int | None = None
+    axis: ResizeAxis
     proportion: float | None = None
     pixels: int | None = None
 
@@ -100,12 +92,8 @@ PlanStep = Annotated[
     | SpawnWindowStep
     | WaitForWindowStep
     | MoveWindowToWorkspaceStep
-    | SetFloatingStep
-    | SetTilingStep
-    | SetFullscreenStep
-    | SetMaximizedStep
-    | SetColumnWidthStep
-    | SetWindowHeightStep
+    | SetWindowStateStep
+    | ResizeWindowStep
     | FocusWindowStep
     | FocusWorkspaceStep,
     Discriminator("kind"),

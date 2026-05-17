@@ -8,11 +8,16 @@ from nirip.planning.models import (
     EnsureWorkspaceStep,
     MoveWindowToWorkspaceStep,
     PlanStep,
-    SetFloatingStep,
-    SetFullscreenStep,
-    SetMaximizedStep,
-    SetTilingStep,
+    SetWindowStateStep,
+    WindowProperty,
 )
+
+_STATE_CHECKS = {
+    WindowProperty.FLOATING: lambda w: w.is_floating,
+    WindowProperty.TILING: lambda w: not w.is_floating,
+    WindowProperty.FULLSCREEN: lambda w: getattr(w, "is_fullscreen", False),
+    WindowProperty.MAXIMIZED: lambda w: getattr(w, "is_maximized", False),
+}
 
 
 def is_already_satisfied(step: PlanStep, snapshot: Snapshot) -> bool:
@@ -27,25 +32,12 @@ def is_already_satisfied(step: PlanStep, snapshot: Snapshot) -> bool:
                 return False
             target = next((ws for ws in snapshot.workspaces.values() if ws.name == step.target_workspace), None)
             return target is not None and w.workspace_id == target.id
-        case SetFloatingStep():
+        case SetWindowStateStep():
             if step.window_id is None:
                 return False
             w = snapshot.windows.get(step.window_id)
-            return w is not None and w.is_floating
-        case SetTilingStep():
-            if step.window_id is None:
+            if w is None:
                 return False
-            w = snapshot.windows.get(step.window_id)
-            return w is not None and not w.is_floating
-        case SetFullscreenStep():
-            if step.window_id is None:
-                return False
-            w = snapshot.windows.get(step.window_id)
-            return w is not None and getattr(w, "is_fullscreen", False) == step.fullscreen
-        case SetMaximizedStep():
-            if step.window_id is None:
-                return False
-            w = snapshot.windows.get(step.window_id)
-            return w is not None and getattr(w, "is_maximized", False) == step.maximized
+            return _STATE_CHECKS[step.property](w) == step.value
         case _:
             return False

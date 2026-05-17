@@ -1,6 +1,7 @@
 """Tests that spawned apps get full placement steps."""
 
 from nirip.planning.compiler import compile_plan
+from nirip.planning.models import WindowProperty
 from nirip.resolve.models import (
     AppResolution,
     MatchDecision,
@@ -73,7 +74,7 @@ def test_spawned_app_gets_placement_steps() -> None:
     assert "spawn_window" in kinds
     assert "wait_for_window" in kinds
     assert "move_window_to_workspace" in kinds
-    assert "set_floating" in kinds
+    assert "set_window_state" in kinds
     assert "focus_window" in kinds
 
 
@@ -81,9 +82,11 @@ def test_spawned_app_placement_has_null_window_id() -> None:
     resolution, normalized = _make_resolution(ResolutionStatus.MISSING, wid=None)
     plan = compile_plan(resolution, normalized)
 
-    float_step = next(s for s in plan.steps if s.kind == "set_floating")
-    assert float_step.window_id is None
-    assert float_step.app_name == "myapp"
+    state_step = next(
+        s for s in plan.steps if s.kind == "set_window_state" and s.property == WindowProperty.FLOATING
+    )
+    assert state_step.window_id is None
+    assert state_step.app_name == "myapp"
 
 
 def test_spawned_app_placement_depends_on_wait() -> None:
@@ -91,5 +94,7 @@ def test_spawned_app_placement_depends_on_wait() -> None:
     plan = compile_plan(resolution, normalized)
 
     wait_step = next(s for s in plan.steps if s.kind == "wait_for_window")
-    float_step = next(s for s in plan.steps if s.kind == "set_floating")
-    assert wait_step.id in float_step.depends_on
+    state_step = next(
+        s for s in plan.steps if s.kind == "set_window_state" and s.property == WindowProperty.FLOATING
+    )
+    assert wait_step.id in state_step.depends_on
