@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+from typing import Any
+
+from niri_pypc.types.generated.models import Window, Workspace
 from niri_state import Snapshot
 
 from nirip.resolve.matcher import assign_windows
@@ -13,6 +16,7 @@ from nirip.resolve.models import (
     Resolution,
     ResolutionStatus,
     WorkspaceResolution,
+    NormalizedApp,
 )
 
 
@@ -89,33 +93,35 @@ def resolve(normalized: NormalizedSession, snapshot: Snapshot) -> Resolution:
     )
 
 
-def _detect_drift(window: object, napp: object, ws_name: str, ws_by_name: dict[str, object]) -> list[DriftItem]:
+_PROPERTY_CHECKS: list[tuple[DriftKind, str, str]] = [
+    (DriftKind.WRONG_FLOATING, "is_floating", "floating"),
+    (DriftKind.WRONG_FULLSCREEN, "is_fullscreen", "fullscreen"),
+]
+
+
+def _detect_drift(
+    window: Window,
+    napp: NormalizedApp,
+    ws_name: str,
+    ws_by_name: dict[str, Workspace],
+) -> list[DriftItem]:
     drift: list[DriftItem] = []
 
     target_ws = ws_by_name.get(ws_name)
-    window_ws_id = getattr(window, "workspace_id", None)
-    if target_ws is None:
-        drift.append(DriftItem(kind=DriftKind.WRONG_WORKSPACE, current=str(window_ws_id), desired=ws_name))
-    elif window_ws_id != getattr(target_ws, "id", None):
-        drift.append(DriftItem(kind=DriftKind.WRONG_WORKSPACE, current=str(window_ws_id), desired=ws_name))
-
-    if getattr(window, "is_floating", False) != napp.placement.floating:
+    if target_ws is None or window.workspace_id != target_ws.id:
         drift.append(
             DriftItem(
-                kind=DriftKind.WRONG_FLOATING,
-                current=str(getattr(window, "is_floating", False)),
-                desired=str(napp.placement.floating),
+                kind=DriftKind.WRONG_WORKSPACE,
+                current=str(window.workspace_id),
+                desired=ws_name,
             )
         )
 
-    if getattr(window, "is_fullscreen", False) != napp.placement.fullscreen:
-        drift.append(
-            DriftItem(
-                kind=DriftKind.WRONG_FULLSCREEN,
-                current=str(getattr(window, "is_fullscreen", False)),
-                desired=str(napp.placement.fullscreen),
-            )
-        )
+    for kind, win_attr, place_attr in _PROPERTY_CHECKS:
+        current_val: Any = getattr(window, win_attr, False)
+        desired_val: Any = getattr(napp.placement, place_attr)
+        if current_val != desired_val:
+            drift.append(DriftItem(kind=kind, current=str(current_val), desired=str(desired_val)))
 
     if hasattr(window, "is_maximized"):
         if window.is_maximized != napp.placement.maximized:

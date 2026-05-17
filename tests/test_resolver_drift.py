@@ -1,5 +1,4 @@
-from types import SimpleNamespace
-
+from tests.conftest import FakeSnapshot, FakeWindow
 from nirip.resolve.models import DriftKind, ResolutionStatus
 from nirip.resolve.normalizer import normalize
 from nirip.resolve.resolver import resolve
@@ -13,7 +12,7 @@ def test_missing_workspace_causes_wrong_workspace_drift() -> None:
         workspaces=[WorkspaceSpec(name="target", apps=[app])],
     )
     normalized = normalize(spec)
-    window = SimpleNamespace(
+    window = FakeWindow(
         id=1,
         app_id="x",
         title="",
@@ -23,7 +22,7 @@ def test_missing_workspace_causes_wrong_workspace_drift() -> None:
         is_fullscreen=False,
         is_maximized=False,
     )
-    snap = SimpleNamespace(
+    snap = FakeSnapshot(
         windows={1: window},
         workspaces={},
     )
