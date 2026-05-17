@@ -8,7 +8,7 @@ from collections.abc import Callable
 from typing import Any
 
 from niri_pypc import actions
-from niri_state import NiriState, Snapshot
+from niri_state import NiriState, Snapshot, WaitTimeoutError
 from niri_state.api.config import NiriStateConfig
 from niri_state.api.waiters import wait_until
 
@@ -63,6 +63,11 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
     match step:
         case EnsureWorkspaceStep():
             await _request(ports.client, actions.focus_workspace(step.workspace_name or ""))
+            await _wait(
+                ports.state,
+                lambda snap: any(ws.name == step.workspace_name for ws in snap.workspaces.values()),
+                timeout=3.0,
+            )
             return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="workspace ensured")
         case MoveWorkspaceToOutputStep():
             workspace_ref = actions.workspace_by_name(step.workspace_name or "")
@@ -113,6 +118,12 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                 ports.client,
                 actions.move_window_to_workspace(workspace_ref, window_id=wid),
             )
+            def moved(snap: Snapshot) -> bool:
+                w = snap.windows.get(wid)
+                target = next((ws for ws in snap.workspaces.values() if ws.name == step.target_workspace), None)
+                return w is not None and target is not None and w.workspace_id == target.id
+
+            await _wait(ports.state, moved, timeout=5.0)
             return StepResult(
                 step=step,
                 outcome=StepOutcome.COMPLETED,
@@ -124,6 +135,14 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
             if wid is None:
                 return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
             await _request(ports.client, actions.move_window_to_floating(wid))
+            try:
+                await _wait(
+                    ports.state,
+                    lambda snap: (w := snap.windows.get(wid)) is not None and w.is_floating,
+                    timeout=1.5,
+                )
+            except WaitTimeoutError:
+                pass
             return StepResult(
                 step=step,
                 outcome=StepOutcome.COMPLETED,
@@ -135,6 +154,14 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
             if wid is None:
                 return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
             await _request(ports.client, actions.move_window_to_tiling(wid))
+            try:
+                await _wait(
+                    ports.state,
+                    lambda snap: (w := snap.windows.get(wid)) is not None and not w.is_floating,
+                    timeout=1.5,
+                )
+            except WaitTimeoutError:
+                pass
             return StepResult(
                 step=step,
                 outcome=StepOutcome.COMPLETED,
@@ -146,6 +173,15 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
             if wid is None:
                 return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
             await _request(ports.client, actions.fullscreen_window(wid))
+            try:
+                await _wait(
+                    ports.state,
+                    lambda snap: (w := snap.windows.get(wid)) is not None
+                    and getattr(w, "is_fullscreen", False) == step.fullscreen,
+                    timeout=1.5,
+                )
+            except WaitTimeoutError:
+                pass
             return StepResult(
                 step=step,
                 outcome=StepOutcome.COMPLETED,
@@ -157,6 +193,15 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
             if wid is None:
                 return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
             await _request(ports.client, actions.maximize_window_to_edges(wid))
+            try:
+                await _wait(
+                    ports.state,
+                    lambda snap: (w := snap.windows.get(wid)) is not None
+                    and getattr(w, "is_maximized", False) == step.maximized,
+                    timeout=1.5,
+                )
+            except WaitTimeoutError:
+                pass
             return StepResult(
                 step=step,
                 outcome=StepOutcome.COMPLETED,
