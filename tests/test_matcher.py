@@ -1,4 +1,5 @@
 from nirip.resolve.matcher import assign_windows, evaluate_rule
+from nirip.resolve.models import MatchTier
 from nirip.spec.models import AppSpec, MatchRule
 
 
@@ -11,8 +12,8 @@ class W:
 
 
 def test_evaluate_rule() -> None:
-    matched, conf, _ = evaluate_rule(MatchRule(app_id="x"), W(1, "x"))
-    assert matched and conf == 1.0
+    matched, tier, _ = evaluate_rule(MatchRule(app_id="x"), W(1, "x"))
+    assert matched and tier == MatchTier.EXACT
 
 
 def test_assign_windows_unique() -> None:
@@ -27,21 +28,21 @@ def test_assign_windows_unique() -> None:
 
 def test_negation_only_rule_matches_non_target() -> None:
     rule = MatchRule(not_rule=MatchRule(app_id="firefox"))
-    matched, confidence, reasons = evaluate_rule(rule, W(1, "alacritty", "Terminal"))
+    matched, tier, reasons = evaluate_rule(rule, W(1, "alacritty", "Terminal"))
     assert matched is True
-    assert confidence == 0.4
+    assert tier == MatchTier.WEAK
     assert any("not_rule satisfied" in r for r in reasons)
 
 
 def test_negation_only_rule_rejects_target() -> None:
     rule = MatchRule(not_rule=MatchRule(app_id="firefox"))
-    matched, confidence, _reasons = evaluate_rule(rule, W(2, "firefox", "Firefox"))
+    matched, tier, _reasons = evaluate_rule(rule, W(2, "firefox", "Firefox"))
     assert matched is False
-    assert confidence == 0.0
+    assert tier == MatchTier.NONE
 
 
 def test_negation_combined_with_positive() -> None:
     rule = MatchRule(app_id="alacritty", not_rule=MatchRule(title="restricted"))
-    matched, confidence, _reasons = evaluate_rule(rule, W(3, "alacritty", "Terminal"))
+    matched, tier, _reasons = evaluate_rule(rule, W(3, "alacritty", "Terminal"))
     assert matched is True
-    assert confidence == 1.0
+    assert tier == MatchTier.EXACT

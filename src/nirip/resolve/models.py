@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from enum import StrEnum
+from enum import IntEnum, StrEnum
 
 from pydantic import computed_field
 
@@ -10,9 +10,19 @@ from nirip._base import NiripModel
 from nirip.spec.models import AppSpec
 
 
+class MatchTier(IntEnum):
+    """Match quality. Higher = more specific = preferred in assignment."""
+
+    NONE = 0
+    WEAK = 1
+    MODERATE = 2
+    STRONG = 3
+    EXACT = 4
+
+
 class MatchCandidate(NiripModel):
     window_id: int
-    confidence: float
+    tier: MatchTier
     reasons: list[str]
 
 
@@ -21,13 +31,17 @@ class MatchDecision(NiripModel):
     workspace_name: str
     assigned_window_id: int | None = None
     candidates: list[MatchCandidate]
-    confidence: float = 0.0
+    tier: MatchTier = MatchTier.NONE
     reasons: list[str]
 
     @computed_field
     @property
     def is_ambiguous(self) -> bool:
-        return sum(1 for c in self.candidates if c.confidence > 0.6) > 1
+        if len(self.candidates) < 2:
+            return False
+        tiers = [MatchTier(c.tier) for c in self.candidates]
+        top = max(tiers)
+        return sum(1 for tier in tiers if tier == top) > 1
 
     @computed_field
     @property

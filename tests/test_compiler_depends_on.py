@@ -3,6 +3,7 @@
 from nirip.planning.compiler import compile_plan
 from nirip.resolve.models import (
     AppResolution,
+    MatchTier,
     MatchDecision,
     Resolution,
     ResolutionStatus,
@@ -41,7 +42,7 @@ def test_depends_on_enforces_ordering() -> None:
                 workspace_name="dev",
                 assigned_window_id=None,
                 candidates=[],
-                confidence=0.0,
+                tier=MatchTier.NONE,
                 reasons=["test"],
             ),
             drift=[],

@@ -21,8 +21,8 @@ from nirip.planning.models import (
 )
 from nirip.planning.ordering import topological_sort
 from nirip.resolve.models import (
-    DriftKind,
     AppResolution,
+    DriftKind,
     Resolution,
     ResolutionStatus,
 )

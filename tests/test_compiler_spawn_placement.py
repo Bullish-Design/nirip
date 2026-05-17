@@ -4,6 +4,7 @@ from nirip.planning.compiler import compile_plan
 from nirip.planning.models import WindowProperty
 from nirip.resolve.models import (
     AppResolution,
+    MatchTier,
     MatchDecision,
     Resolution,
     ResolutionStatus,
@@ -27,7 +28,7 @@ def _make_resolution(status: ResolutionStatus, wid: int | None = None) -> tuple[
         workspace_name="dev",
         assigned_window_id=wid,
         candidates=[],
-        confidence=0.0 if wid is None else 1.0,
+        tier=MatchTier.NONE if wid is None else MatchTier.EXACT,
         reasons=["test"],
     )
     ar = AppResolution(
