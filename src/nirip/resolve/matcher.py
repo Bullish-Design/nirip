@@ -78,7 +78,7 @@ def evaluate_rule(rule: MatchRule, window: Window) -> tuple[bool, float, list[st
     if failed:
         return False, 0.0, reasons
     if not scores:
-        return False, 0.0, reasons
+        return True, 0.4, reasons
 
     confidence = min(scores) if len(scores) > 1 else scores[0]
     return True, confidence, reasons
