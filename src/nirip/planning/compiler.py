@@ -193,6 +193,37 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                 )
             )
 
+    app_first_step: dict[str, str] = {}
+    app_last_step: dict[str, str] = {}
+    for s in steps:
+        if s.app_name and s.workspace_name:
+            key = f"{s.workspace_name}/{s.app_name}"
+            if key not in app_first_step:
+                app_first_step[key] = s.id
+            app_last_step[key] = s.id
+
+    deps_to_add: dict[str, list[str]] = {}
+    for nws in normalized.workspaces:
+        for app_name in nws.app_names:
+            napp = normalized.app_index[f"{nws.name}/{app_name}"]
+            if not napp.depends_on:
+                continue
+            first_key = f"{nws.name}/{app_name}"
+            first_id = app_first_step.get(first_key)
+            if first_id is None:
+                continue
+            for dep_name in napp.depends_on:
+                dep_key = f"{nws.name}/{dep_name}"
+                dep_last = app_last_step.get(dep_key)
+                if dep_last:
+                    deps_to_add.setdefault(first_id, []).append(dep_last)
+
+    if deps_to_add:
+        steps = [
+            s.model_copy(update={"depends_on": s.depends_on + deps_to_add[s.id]}) if s.id in deps_to_add else s
+            for s in steps
+        ]
+
     steps = topological_sort(steps)
 
     return Plan(session_name=resolution.session_name, steps=steps, resolution=resolution)
