@@ -84,15 +84,26 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                 app_state.spawn_pid = proc.pid
             return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="spawned", spawn_pid=proc.pid)
         case WaitForWindowStep():
-            async def predicate(snap: Any) -> bool:
+            matched_wid: int | None = None
+
+            def predicate(snap: Any) -> bool:
+                nonlocal matched_wid
                 for w in snap.windows.values():
                     matched, _, _ = evaluate_rule(step.match, w)
                     if matched:
+                        matched_wid = w.id
                         return True
                 return False
 
             await _wait(ports.state, predicate, step.timeout_s)
-            return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="window appeared")
+            if step.app_name and step.app_name in runtime.apps:
+                runtime.apps[step.app_name].matched_window_id = matched_wid
+            return StepResult(
+                step=step,
+                outcome=StepOutcome.COMPLETED,
+                message=f"window appeared (id={matched_wid})",
+                window_id=matched_wid,
+            )
         case MoveWindowToWorkspaceStep():
             wid = _resolve_window_id(step, runtime)
             if wid is None:
