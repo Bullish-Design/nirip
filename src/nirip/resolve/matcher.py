@@ -7,8 +7,8 @@ from collections.abc import Iterable
 
 from niri_pypc.types.generated.models import Window
 
-from nirip.resolve.models import MatchCandidate, MatchDecision, NormalizedApp
-from nirip.spec.models import MatchRule
+from nirip.resolve.models import MatchCandidate, MatchDecision
+from nirip.spec.models import AppSpec, MatchRule
 
 
 def evaluate_rule(rule: MatchRule, window: Window) -> tuple[bool, float, list[str]]:
@@ -84,15 +84,15 @@ def evaluate_rule(rule: MatchRule, window: Window) -> tuple[bool, float, list[st
     return True, confidence, reasons
 
 
-def assign_windows(apps: list[NormalizedApp], windows: Iterable[Window]) -> list[MatchDecision]:
+def assign_windows(apps: list[tuple[str, AppSpec]], windows: Iterable[Window]) -> list[MatchDecision]:
     """Globally consistent 1:1 app-to-window assignment."""
     window_list = list(windows)
 
     all_candidates: list[list[MatchCandidate]] = []
-    for app in apps:
+    for ws_name, app_spec in apps:
         candidates = []
         for w in window_list:
-            matched, conf, reasons = evaluate_rule(app.match, w)
+            matched, conf, reasons = evaluate_rule(app_spec.match, w)
             if matched:
                 candidates.append(MatchCandidate(window_id=w.id, confidence=conf, reasons=reasons))
         all_candidates.append(candidates)
@@ -115,7 +115,7 @@ def assign_windows(apps: list[NormalizedApp], windows: Iterable[Window]) -> list
         assigned_window.add(window_id)
 
     decisions: list[MatchDecision] = []
-    for app_idx, app in enumerate(apps):
+    for app_idx, (ws_name, app_spec) in enumerate(apps):
         candidates = all_candidates[app_idx]
         wid = app_to_window.get(app_idx)
         conf = 0.0
@@ -131,8 +131,8 @@ def assign_windows(apps: list[NormalizedApp], windows: Iterable[Window]) -> list
 
         decisions.append(
             MatchDecision(
-                app_name=app.name,
-                workspace_name=app.workspace_name,
+                app_name=app_spec.name,
+                workspace_name=ws_name,
                 assigned_window_id=wid,
                 candidates=candidates,
                 confidence=conf,

@@ -5,26 +5,22 @@ from nirip.planning.models import WindowProperty
 from nirip.resolve.models import (
     AppResolution,
     MatchDecision,
-    NormalizedApp,
-    NormalizedSession,
-    NormalizedWorkspace,
     Resolution,
     ResolutionStatus,
     WorkspaceResolution,
 )
-from nirip.spec.models import MatchRule, PlacementSpec, SessionOptions, SpawnSpec
+from nirip.spec.models import AppSpec, MatchRule, PlacementSpec, SessionOptions, SpawnSpec
 
 
-def _make_resolution(status: ResolutionStatus, wid: int | None = None) -> tuple[Resolution, NormalizedSession]:
-    napp = NormalizedApp(
+def _make_resolution(status: ResolutionStatus, wid: int | None = None) -> tuple[Resolution, SessionOptions]:
+    app_spec = AppSpec(
         name="myapp",
-        workspace_name="dev",
         match=MatchRule(app_id="myapp"),
         spawn=SpawnSpec(command="myapp"),
         placement=PlacementSpec(floating=True, focus=True),
         optional=False,
-        startup_timeout_s=10.0,
         depends_on=[],
+        startup_timeout_s=10.0,
     )
     decision = MatchDecision(
         app_name="myapp",
@@ -40,6 +36,8 @@ def _make_resolution(status: ResolutionStatus, wid: int | None = None) -> tuple[
         status=status,
         match_decision=decision,
         drift=[],
+        spec=app_spec,
+        startup_timeout_s=10.0,
     )
     wr = WorkspaceResolution(
         name="dev",
@@ -47,6 +45,7 @@ def _make_resolution(status: ResolutionStatus, wid: int | None = None) -> tuple[
         output_correct=True,
         desired_output=None,
         current_output=None,
+        focus=False,
         app_resolutions=[ar],
     )
     resolution = Resolution(
@@ -54,20 +53,13 @@ def _make_resolution(status: ResolutionStatus, wid: int | None = None) -> tuple[
         workspace_resolutions=[wr],
         warnings=[],
     )
-    normalized = NormalizedSession(
-        name="test",
-        description="",
-        options=SessionOptions(),
-        workspaces=[NormalizedWorkspace(name="dev", output=None, focus=False, app_names=["myapp"])],
-        apps=[napp],
-        app_index={"dev/myapp": napp},
-    )
-    return resolution, normalized
+    options = SessionOptions()
+    return resolution, options
 
 
 def test_spawned_app_gets_placement_steps() -> None:
-    resolution, normalized = _make_resolution(ResolutionStatus.MISSING, wid=None)
-    plan = compile_plan(resolution, normalized)
+    resolution, options = _make_resolution(ResolutionStatus.MISSING, wid=None)
+    plan = compile_plan(resolution, options)
 
     kinds = [s.kind for s in plan.steps]
     assert "spawn_window" in kinds
@@ -78,8 +70,8 @@ def test_spawned_app_gets_placement_steps() -> None:
 
 
 def test_spawned_app_placement_has_null_window_id() -> None:
-    resolution, normalized = _make_resolution(ResolutionStatus.MISSING, wid=None)
-    plan = compile_plan(resolution, normalized)
+    resolution, options = _make_resolution(ResolutionStatus.MISSING, wid=None)
+    plan = compile_plan(resolution, options)
 
     state_step = next(
         s for s in plan.steps if s.kind == "set_window_state" and s.property == WindowProperty.FLOATING
@@ -89,8 +81,8 @@ def test_spawned_app_placement_has_null_window_id() -> None:
 
 
 def test_spawned_app_placement_depends_on_wait() -> None:
-    resolution, normalized = _make_resolution(ResolutionStatus.MISSING, wid=None)
-    plan = compile_plan(resolution, normalized)
+    resolution, options = _make_resolution(ResolutionStatus.MISSING, wid=None)
+    plan = compile_plan(resolution, options)
 
     wait_step = next(s for s in plan.steps if s.kind == "wait_for_window")
     state_step = next(

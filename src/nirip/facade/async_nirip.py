@@ -13,7 +13,6 @@ from nirip.execution.executor import execute_plan
 from nirip.execution.models import ApplyResult, SessionPorts
 from nirip.planning.compiler import compile_diff, compile_plan
 from nirip.planning.models import Plan, SessionDiff
-from nirip.resolve.normalizer import normalize
 from nirip.resolve.resolver import resolve
 from nirip.spec.models import SessionSpec
 
@@ -41,19 +40,16 @@ class AsyncNirip:
         return self._state.health()
 
     async def diff(self, spec: SessionSpec) -> SessionDiff:
-        normalized = normalize(spec)
-        resolution = resolve(normalized, self.snapshot)
+        resolution = resolve(spec, self.snapshot)
         return compile_diff(resolution)
 
     async def plan(self, spec: SessionSpec) -> Plan:
-        normalized = normalize(spec)
-        resolution = resolve(normalized, self.snapshot)
-        return compile_plan(resolution, normalized)
+        resolution = resolve(spec, self.snapshot)
+        return compile_plan(resolution, spec.options)
 
     async def apply(self, spec: SessionSpec) -> ApplyResult:
-        normalized = normalize(spec)
-        resolution = resolve(normalized, self.snapshot)
-        plan = compile_plan(resolution, normalized)
+        resolution = resolve(spec, self.snapshot)
+        plan = compile_plan(resolution, spec.options)
         if plan.is_empty:
             return ApplyResult(session_name=spec.name, success=True, steps=[], total_duration_s=0.0)
         ports = SessionPorts(state=self._state, client=self._client)

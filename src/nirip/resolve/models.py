@@ -4,37 +4,10 @@ from __future__ import annotations
 
 from enum import StrEnum
 
-from pydantic import Field, computed_field
+from pydantic import computed_field
 
 from nirip._base import NiripModel
-from nirip.spec.models import MatchRule, PlacementSpec, SessionOptions, SpawnSpec
-
-
-class NormalizedApp(NiripModel):
-    name: str
-    workspace_name: str
-    match: MatchRule
-    spawn: SpawnSpec | None
-    placement: PlacementSpec
-    optional: bool
-    startup_timeout_s: float
-    depends_on: list[str]
-
-
-class NormalizedWorkspace(NiripModel):
-    name: str
-    output: str | None
-    focus: bool
-    app_names: list[str]
-
-
-class NormalizedSession(NiripModel):
-    name: str
-    description: str
-    options: SessionOptions
-    workspaces: list[NormalizedWorkspace]
-    apps: list[NormalizedApp]
-    app_index: dict[str, NormalizedApp] = Field(default_factory=dict)
+from nirip.spec.models import AppSpec
 
 
 class MatchCandidate(NiripModel):
@@ -89,6 +62,8 @@ class AppResolution(NiripModel):
     status: ResolutionStatus
     match_decision: MatchDecision
     drift: list[DriftItem]
+    spec: AppSpec
+    startup_timeout_s: float
 
     @computed_field
     @property
@@ -102,6 +77,7 @@ class WorkspaceResolution(NiripModel):
     output_correct: bool
     desired_output: str | None
     current_output: str | None
+    focus: bool
     app_resolutions: list[AppResolution]
 
 

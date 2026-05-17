@@ -4,7 +4,6 @@ import pytest
 
 from nirip.errors import PlanningError
 from nirip.planning.compiler import _parse_size, compile_plan
-from nirip.resolve.normalizer import normalize
 from nirip.resolve.resolver import resolve
 from nirip.spec.models import AppSpec, MatchRule, SessionSpec, SpawnSpec, WorkspaceSpec
 
@@ -24,10 +23,9 @@ def test_compiler_propagates_spawn_and_wait_data() -> None:
             )
         ],
     )
-    normalized = normalize(spec)
     snap = SimpleNamespace(windows={}, workspaces={})
-    resolution = resolve(normalized, snap)
-    plan = compile_plan(resolution, normalized)
+    resolution = resolve(spec, snap)
+    plan = compile_plan(resolution, spec.options)
     kinds = [s.kind for s in plan.steps]
     assert "spawn_window" in kinds
     assert "wait_for_window" in kinds

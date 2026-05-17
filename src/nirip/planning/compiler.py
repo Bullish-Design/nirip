@@ -22,8 +22,6 @@ from nirip.planning.models import (
 from nirip.planning.ordering import topological_sort
 from nirip.resolve.models import (
     DriftKind,
-    NormalizedApp,
-    NormalizedSession,
     AppResolution,
     Resolution,
     ResolutionStatus,
@@ -46,7 +44,7 @@ def _should_act(ar: AppResolution, options: SessionOptions) -> bool:
             return False
 
 
-def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
+def compile_plan(resolution: Resolution, options: SessionOptions) -> Plan:
     """Compile resolution into ordered execution plan."""
     steps: list[PlanStep] = []
     step_counter = 0
@@ -80,15 +78,14 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
             )
 
         for ar in wr.app_resolutions:
-            if not _should_act(ar, normalized.options):
+            if not _should_act(ar, options):
                 continue
 
-            napp = normalized.app_index[f"{wr.name}/{ar.app_name}"]
             base_deps = [ensure_id] if ensure_id else []
             placement_deps = list(base_deps)
             wid = ar.match_decision.assigned_window_id
 
-            if ar.status == ResolutionStatus.MISSING and napp.spawn:
+            if ar.status == ResolutionStatus.MISSING and ar.spec.spawn:
                 spawn_id = next_id("spawn")
                 wait_id = next_id("wait")
                 steps.append(
@@ -97,10 +94,10 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                         description=f"spawn {ar.app_name}",
                         app_name=ar.app_name,
                         workspace_name=wr.name,
-                        command=napp.spawn.command,
-                        cwd=napp.spawn.cwd,
-                        env=napp.spawn.env,
-                        shell=napp.spawn.shell,
+                        command=ar.spec.spawn.command,
+                        cwd=ar.spec.spawn.cwd,
+                        env=ar.spec.spawn.env,
+                        shell=ar.spec.spawn.shell,
                         depends_on=base_deps,
                     )
                 )
@@ -110,8 +107,8 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                         description=f"wait for {ar.app_name}",
                         app_name=ar.app_name,
                         workspace_name=wr.name,
-                        match=napp.match,
-                        timeout_s=napp.startup_timeout_s,
+                        match=ar.spec.match,
+                        timeout_s=ar.startup_timeout_s,
                         depends_on=[spawn_id],
                     )
                 )
@@ -134,7 +131,7 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                 d.kind == DriftKind.WRONG_FLOATING for d in ar.drift
             )
             if needs_float_or_tile_correction:
-                prop = WindowProperty.FLOATING if napp.placement.floating else WindowProperty.TILING
+                prop = WindowProperty.FLOATING if ar.spec.placement.floating else WindowProperty.TILING
                 steps.append(
                     SetWindowStateStep(
                         id=next_id("state"),
@@ -153,7 +150,7 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                         id=next_id("state"),
                         window_id=wid,
                         property=WindowProperty.FULLSCREEN,
-                        value=napp.placement.fullscreen,
+                        value=ar.spec.placement.fullscreen,
                         description=f"set {ar.app_name} fullscreen",
                         app_name=ar.app_name,
                         workspace_name=wr.name,
@@ -167,7 +164,7 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                         id=next_id("state"),
                         window_id=wid,
                         property=WindowProperty.MAXIMIZED,
-                        value=napp.placement.maximized,
+                        value=ar.spec.placement.maximized,
                         description=f"set {ar.app_name} maximized",
                         app_name=ar.app_name,
                         workspace_name=wr.name,
@@ -175,8 +172,8 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                     )
                 )
 
-            if napp.placement.column_width is not None:
-                prop, px = _parse_size(napp.placement.column_width)
+            if ar.spec.placement.column_width is not None:
+                prop, px = _parse_size(ar.spec.placement.column_width)
                 steps.append(
                     ResizeWindowStep(
                         id=next_id("resize"),
@@ -191,8 +188,8 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                     )
                 )
 
-            if napp.placement.window_height is not None:
-                prop, px = _parse_size(napp.placement.window_height)
+            if ar.spec.placement.window_height is not None:
+                prop, px = _parse_size(ar.spec.placement.window_height)
                 steps.append(
                     ResizeWindowStep(
                         id=next_id("resize"),
@@ -207,7 +204,7 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                     )
                 )
 
-            if napp.placement.focus:
+            if ar.spec.placement.focus:
                 steps.append(
                     FocusWindowStep(
                         id=next_id("focus"),
@@ -219,13 +216,13 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                     )
                 )
 
-    for nws in normalized.workspaces:
-        if nws.focus:
+    for wr in resolution.workspace_resolutions:
+        if wr.focus:
             steps.append(
                 FocusWorkspaceStep(
                     id=next_id("focus-ws"),
-                    description=f"focus workspace '{nws.name}'",
-                    workspace_name=nws.name,
+                    description=f"focus workspace '{wr.name}'",
+                    workspace_name=wr.name,
                 )
             )
 
@@ -239,17 +236,16 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
             app_last_step[key] = s.id
 
     deps_to_add: dict[str, list[str]] = {}
-    for nws in normalized.workspaces:
-        for app_name in nws.app_names:
-            napp = normalized.app_index[f"{nws.name}/{app_name}"]
-            if not napp.depends_on:
+    for wr in resolution.workspace_resolutions:
+        for ar in wr.app_resolutions:
+            if not ar.spec.depends_on:
                 continue
-            first_key = f"{nws.name}/{app_name}"
+            first_key = f"{wr.name}/{ar.app_name}"
             first_id = app_first_step.get(first_key)
             if first_id is None:
                 continue
-            for dep_name in napp.depends_on:
-                dep_key = f"{nws.name}/{dep_name}"
+            for dep_name in ar.spec.depends_on:
+                dep_key = f"{wr.name}/{dep_name}"
                 dep_last = app_last_step.get(dep_key)
                 if dep_last:
                     deps_to_add.setdefault(first_id, []).append(dep_last)

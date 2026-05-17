@@ -4,45 +4,40 @@ from nirip.planning.compiler import compile_plan
 from nirip.resolve.models import (
     AppResolution,
     MatchDecision,
-    NormalizedApp,
-    NormalizedSession,
-    NormalizedWorkspace,
     Resolution,
     ResolutionStatus,
     WorkspaceResolution,
 )
-from nirip.spec.models import MatchRule, PlacementSpec, SessionOptions, SpawnSpec
+from nirip.spec.models import AppSpec, MatchRule, PlacementSpec, SessionOptions, SpawnSpec
 
 
 def test_depends_on_enforces_ordering() -> None:
-    napp_a = NormalizedApp(
+    app_a = AppSpec(
         name="app_a",
-        workspace_name="dev",
         match=MatchRule(app_id="app_a"),
         spawn=SpawnSpec(command="app_a"),
         placement=PlacementSpec(),
         optional=False,
-        startup_timeout_s=10.0,
         depends_on=[],
+        startup_timeout_s=10.0,
     )
-    napp_b = NormalizedApp(
+    app_b = AppSpec(
         name="app_b",
-        workspace_name="dev",
         match=MatchRule(app_id="app_b"),
         spawn=SpawnSpec(command="app_b"),
         placement=PlacementSpec(),
         optional=False,
-        startup_timeout_s=10.0,
         depends_on=["app_a"],
+        startup_timeout_s=10.0,
     )
 
-    def make_ar(name: str) -> AppResolution:
+    def make_ar(spec: AppSpec) -> AppResolution:
         return AppResolution(
-            app_name=name,
+            app_name=spec.name,
             workspace_name="dev",
             status=ResolutionStatus.MISSING,
             match_decision=MatchDecision(
-                app_name=name,
+                app_name=spec.name,
                 workspace_name="dev",
                 assigned_window_id=None,
                 candidates=[],
@@ -50,6 +45,8 @@ def test_depends_on_enforces_ordering() -> None:
                 reasons=["test"],
             ),
             drift=[],
+            spec=spec,
+            startup_timeout_s=10.0,
         )
 
     wr = WorkspaceResolution(
@@ -58,23 +55,15 @@ def test_depends_on_enforces_ordering() -> None:
         output_correct=True,
         desired_output=None,
         current_output=None,
-        app_resolutions=[make_ar("app_a"), make_ar("app_b")],
+        focus=False,
+        app_resolutions=[make_ar(app_a), make_ar(app_b)],
     )
     resolution = Resolution(
         session_name="test",
         workspace_resolutions=[wr],
         warnings=[],
     )
-    normalized = NormalizedSession(
-        name="test",
-        description="",
-        options=SessionOptions(),
-        workspaces=[NormalizedWorkspace(name="dev", output=None, focus=False, app_names=["app_a", "app_b"])],
-        apps=[napp_a, napp_b],
-        app_index={"dev/app_a": napp_a, "dev/app_b": napp_b},
-    )
-
-    plan = compile_plan(resolution, normalized)
+    plan = compile_plan(resolution, SessionOptions())
 
     a_steps = [s for s in plan.steps if s.app_name == "app_a"]
     b_steps = [s for s in plan.steps if s.app_name == "app_b"]

@@ -1,5 +1,4 @@
 from nirip.resolve.models import DriftKind, ResolutionStatus
-from nirip.resolve.normalizer import normalize
 from nirip.resolve.resolver import resolve
 from nirip.spec.models import AppSpec, MatchRule, SessionSpec, WorkspaceSpec
 from tests.conftest import FakeSnapshot, FakeWindow
@@ -11,7 +10,6 @@ def test_missing_workspace_causes_wrong_workspace_drift() -> None:
         name="s",
         workspaces=[WorkspaceSpec(name="target", apps=[app])],
     )
-    normalized = normalize(spec)
     window = FakeWindow(
         id=1,
         app_id="x",
@@ -26,7 +24,7 @@ def test_missing_workspace_causes_wrong_workspace_drift() -> None:
         windows={1: window},
         workspaces={},
     )
-    result = resolve(normalized, snap)
+    result = resolve(spec, snap)
     ar = result.workspace_resolutions[0].app_resolutions[0]
     assert ar.status == ResolutionStatus.DRIFTED
     assert any(d.kind == DriftKind.WRONG_WORKSPACE for d in ar.drift)

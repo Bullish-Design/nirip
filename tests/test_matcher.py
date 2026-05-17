@@ -1,5 +1,5 @@
 from nirip.resolve.matcher import assign_windows, evaluate_rule
-from nirip.spec.models import MatchRule
+from nirip.spec.models import AppSpec, MatchRule
 
 
 class W:
@@ -10,20 +10,16 @@ class W:
         self.pid = None
 
 
-class A:
-    def __init__(self, name: str, rule: MatchRule) -> None:
-        self.name = name
-        self.workspace_name = "w"
-        self.match = rule
-
-
 def test_evaluate_rule() -> None:
     matched, conf, _ = evaluate_rule(MatchRule(app_id="x"), W(1, "x"))
     assert matched and conf == 1.0
 
 
 def test_assign_windows_unique() -> None:
-    apps = [A("a", MatchRule(app_id="x")), A("b", MatchRule(app_id="y"))]
+    apps = [
+        ("w", AppSpec(name="a", match=MatchRule(app_id="x"))),
+        ("w", AppSpec(name="b", match=MatchRule(app_id="y"))),
+    ]
     decisions = assign_windows(apps, [W(1, "x"), W(2, "y")])
     ids = [d.assigned_window_id for d in decisions if d.assigned_window_id is not None]
     assert len(ids) == len(set(ids))
