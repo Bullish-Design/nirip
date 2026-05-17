@@ -52,8 +52,6 @@ def _make_resolution(status: ResolutionStatus, wid: int | None = None) -> tuple[
     resolution = Resolution(
         session_name="test",
         workspace_resolutions=[wr],
-        unmatched_apps=[ar] if status == ResolutionStatus.MISSING else [],
-        ambiguous_apps=[],
         warnings=[],
     )
     normalized = NormalizedSession(

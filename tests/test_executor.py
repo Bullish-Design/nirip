@@ -24,8 +24,6 @@ def test_execute_plan_basic() -> None:
     resolution = Resolution(
         session_name="s",
         workspace_resolutions=[],
-        unmatched_apps=[],
-        ambiguous_apps=[],
         warnings=[],
     )
     plan = Plan(

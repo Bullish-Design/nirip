@@ -28,8 +28,6 @@ def resolve(normalized: NormalizedSession, snapshot: Snapshot) -> Resolution:
     decision_index = {(d.workspace_name, d.app_name): d for d in decisions}
 
     workspace_resolutions: list[WorkspaceResolution] = []
-    unmatched: list[AppResolution] = []
-    ambiguous: list[AppResolution] = []
 
     for nws in normalized.workspaces:
         live_ws = ws_by_name.get(nws.name)
@@ -68,11 +66,6 @@ def resolve(normalized: NormalizedSession, snapshot: Snapshot) -> Resolution:
             )
             app_resolutions.append(ar)
 
-            if status == ResolutionStatus.MISSING:
-                unmatched.append(ar)
-            if status == ResolutionStatus.AMBIGUOUS:
-                ambiguous.append(ar)
-
         workspace_resolutions.append(
             WorkspaceResolution(
                 name=nws.name,
@@ -87,8 +80,6 @@ def resolve(normalized: NormalizedSession, snapshot: Snapshot) -> Resolution:
     return Resolution(
         session_name=normalized.name,
         workspace_resolutions=workspace_resolutions,
-        unmatched_apps=unmatched,
-        ambiguous_apps=ambiguous,
         warnings=[],
     )
 

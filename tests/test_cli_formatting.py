@@ -21,8 +21,6 @@ def test_format_plan_empty() -> None:
     resolution = Resolution(
         session_name="test",
         workspace_resolutions=[],
-        unmatched_apps=[],
-        ambiguous_apps=[],
         warnings=[],
     )
     plan = Plan(session_name="test", steps=[], resolution=resolution, warnings=[])

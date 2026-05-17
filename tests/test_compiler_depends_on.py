@@ -64,8 +64,6 @@ def test_depends_on_enforces_ordering() -> None:
     resolution = Resolution(
         session_name="test",
         workspace_resolutions=[wr],
-        unmatched_apps=[],
-        ambiguous_apps=[],
         warnings=[],
     )
     normalized = NormalizedSession(

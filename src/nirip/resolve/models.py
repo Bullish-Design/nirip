@@ -114,9 +114,22 @@ class WorkspaceResolution(NiripModel):
 class Resolution(NiripModel):
     session_name: str
     workspace_resolutions: list[WorkspaceResolution]
-    unmatched_apps: list[AppResolution]
-    ambiguous_apps: list[AppResolution]
     warnings: list[str]
+
+    @computed_field
+    @property
+    def all_app_resolutions(self) -> list[AppResolution]:
+        return [ar for wr in self.workspace_resolutions for ar in wr.app_resolutions]
+
+    @computed_field
+    @property
+    def unmatched_apps(self) -> list[AppResolution]:
+        return [ar for ar in self.all_app_resolutions if ar.status == ResolutionStatus.MISSING]
+
+    @computed_field
+    @property
+    def ambiguous_apps(self) -> list[AppResolution]:
+        return [ar for ar in self.all_app_resolutions if ar.status == ResolutionStatus.AMBIGUOUS]
 
     @computed_field
     @property
@@ -126,7 +139,7 @@ class Resolution(NiripModel):
                 return True
             if any(ar.action_required for ar in wr.app_resolutions):
                 return True
-        return bool(self.unmatched_apps)
+        return any(ar.status == ResolutionStatus.MISSING for ar in self.all_app_resolutions)
 
     @computed_field
     @property
