@@ -82,7 +82,7 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                 app_state = runtime.apps[step.app_name]
                 app_state.spawned = True
                 app_state.spawn_pid = proc.pid
-            return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="spawned", window_id=proc.pid)
+            return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="spawned", spawn_pid=proc.pid)
         case WaitForWindowStep():
             async def predicate(snap: Any) -> bool:
                 for w in snap.windows.values():

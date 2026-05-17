@@ -25,6 +25,7 @@ class StepResult(NiripModel):
     outcome: StepOutcome
     message: str
     window_id: int | None = None
+    spawn_pid: int | None = None
     duration_s: float = 0.0
 
 
