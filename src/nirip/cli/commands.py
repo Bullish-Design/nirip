@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import sys
 from pathlib import Path
 
@@ -22,7 +23,7 @@ async def cmd_apply(session_file: str, *, yes: bool = False) -> str:
             text = yaml.dump(diff.model_dump(), default_flow_style=False)
             print(text, file=sys.stderr)
             if diff.has_drift:
-                answer = input("Apply? [y/N] ")
+                answer = await asyncio.to_thread(input, "Apply? [y/N] ")
                 if answer.lower() != "y":
                     return "aborted"
 
