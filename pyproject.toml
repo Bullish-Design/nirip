@@ -59,8 +59,9 @@ include = [
 addopts = "-q --cov=nirip --cov-report=term-missing"
 testpaths = ["tests"]
 
-[tool.ty]
-src = ["src"]
+[tool.ty.src]
+include = ["src"]
+exclude = []
 
 [tool.ty.environment]
 python-version = "3.13"
