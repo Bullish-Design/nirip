@@ -14,6 +14,7 @@ def build_parser() -> argparse.ArgumentParser:
     p_apply = sub.add_parser("apply", help="Apply a session spec")
     p_apply.add_argument("session_file")
     p_apply.add_argument("-y", "--yes", action="store_true", help="Skip confirmation")
+    p_apply.add_argument("--dry-run", action="store_true", help="Show plan without executing")
 
     p_diff = sub.add_parser("diff", help="Show what would change")
     p_diff.add_argument("session_file")
@@ -40,7 +41,7 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         if args.command == "apply":
-            output = asyncio.run(cmd_apply(args.session_file, yes=args.yes))
+            output = asyncio.run(cmd_apply(args.session_file, yes=args.yes, dry_run=args.dry_run))
         elif args.command == "diff":
             output = asyncio.run(cmd_diff(args.session_file))
         elif args.command == "plan":
