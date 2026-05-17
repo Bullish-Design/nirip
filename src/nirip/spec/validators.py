@@ -57,12 +57,22 @@ def _check_unique_app_names(spec: SessionSpec, errors: list[str]) -> None:
 
 
 def _check_depends_on_refs(spec: SessionSpec, errors: list[str]) -> None:
+    """Validate depends_on references and check for cycles."""
     ws_apps: dict[str, set[str]] = {ws.name: {a.name for a in ws.apps} for ws in spec.workspaces}
+    has_dangling = False
+
     for ws in spec.workspaces:
         for app in ws.apps:
             for dep in app.depends_on:
                 if dep not in ws_apps[ws.name]:
-                    errors.append(f"app {ws.name}/{app.name} depends on unknown app {dep}")
+                    errors.append(
+                        f"{ws.name}/{app.name} depends on '{dep}' which does not exist "
+                        f"in workspace '{ws.name}' (cross-workspace dependencies are not supported)"
+                    )
+                    has_dangling = True
+
+    if has_dangling:
+        return
 
     graph: dict[str, list[str]] = {}
     for ws in spec.workspaces:
