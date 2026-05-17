@@ -13,6 +13,7 @@ def test_match_rule_non_empty() -> None:
         MatchRule()
 
 
-def test_options_mode_literal() -> None:
-    with pytest.raises(ValueError):
-        SessionOptions(mode="invalid")
+def test_options_defaults() -> None:
+    opts = SessionOptions()
+    assert opts.launch_missing is True
+    assert opts.stop_on_error is True

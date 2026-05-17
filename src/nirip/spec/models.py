@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Literal
-
 from pydantic import ConfigDict, Field, model_validator
 
 from nirip._base import NiripModel
@@ -83,11 +81,8 @@ class WorkspaceSpec(NiripModel):
 
 
 class SessionOptions(NiripModel):
-    mode: Literal["reconcile", "clean"] = "reconcile"
-    match_existing: bool = True
     launch_missing: bool = True
     stop_on_error: bool = True
-    move_unmatched: bool = False
     default_startup_timeout_s: float = 20.0
 
 
