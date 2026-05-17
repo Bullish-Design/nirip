@@ -33,20 +33,3 @@ class FakeSnapshot:
     outputs: dict[str, Any] = field(default_factory=dict)
     focused_window_id: int | None = None
     focused_workspace_id: int | None = None
-
-
-class RecordingClient:
-    def __init__(self) -> None:
-        self.requests: list[Any] = []
-        self._closed = False
-
-    async def request(self, req: Any, **kw: Any) -> Any:
-        self.requests.append(req)
-        return None
-
-    async def close(self) -> None:
-        self._closed = True
-
-    @property
-    def is_closed(self) -> bool:
-        return self._closed
