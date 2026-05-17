@@ -1,5 +1,6 @@
-import pytest
 from types import SimpleNamespace
+
+import pytest
 
 from nirip.errors import PlanningError
 from nirip.planning.compiler import _parse_size, compile_plan

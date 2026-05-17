@@ -12,11 +12,11 @@ from nirip.resolve.models import (
     AppResolution,
     DriftItem,
     DriftKind,
+    NormalizedApp,
     NormalizedSession,
     Resolution,
     ResolutionStatus,
     WorkspaceResolution,
-    NormalizedApp,
 )
 
 

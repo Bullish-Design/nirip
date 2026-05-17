@@ -1,8 +1,8 @@
-from tests.conftest import FakeSnapshot, FakeWindow
 from nirip.resolve.models import DriftKind, ResolutionStatus
 from nirip.resolve.normalizer import normalize
 from nirip.resolve.resolver import resolve
 from nirip.spec.models import AppSpec, MatchRule, SessionSpec, WorkspaceSpec
+from tests.conftest import FakeSnapshot, FakeWindow
 
 
 def test_missing_workspace_causes_wrong_workspace_drift() -> None:

@@ -113,14 +113,17 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
             wid = _resolve_window_id(step, runtime)
             if wid is None:
                 return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
+            wid_int = wid
+            target_workspace = step.target_workspace
             workspace_ref = actions.workspace_by_name(step.target_workspace)
             await _request(
                 ports.client,
-                actions.move_window_to_workspace(workspace_ref, window_id=wid),
+                actions.move_window_to_workspace(workspace_ref, window_id=wid_int),
             )
+
             def moved(snap: Snapshot) -> bool:
-                w = snap.windows.get(wid)
-                target = next((ws for ws in snap.workspaces.values() if ws.name == step.target_workspace), None)
+                w = snap.windows.get(wid_int)
+                target = next((ws for ws in snap.workspaces.values() if ws.name == target_workspace), None)
                 return w is not None and target is not None and w.workspace_id == target.id
 
             await _wait(ports.state, moved, timeout=5.0)
@@ -128,17 +131,18 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                 step=step,
                 outcome=StepOutcome.COMPLETED,
                 message="window moved",
-                window_id=wid,
+                window_id=wid_int,
             )
         case SetFloatingStep():
             wid = _resolve_window_id(step, runtime)
             if wid is None:
                 return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
-            await _request(ports.client, actions.move_window_to_floating(wid))
+            wid_int = wid
+            await _request(ports.client, actions.move_window_to_floating(wid_int))
             try:
                 await _wait(
                     ports.state,
-                    lambda snap: (w := snap.windows.get(wid)) is not None and w.is_floating,
+                    lambda snap: (w := snap.windows.get(wid_int)) is not None and w.is_floating,
                     timeout=1.5,
                 )
             except WaitTimeoutError:
@@ -147,17 +151,18 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                 step=step,
                 outcome=StepOutcome.COMPLETED,
                 message="window set floating",
-                window_id=wid,
+                window_id=wid_int,
             )
         case SetTilingStep():
             wid = _resolve_window_id(step, runtime)
             if wid is None:
                 return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
-            await _request(ports.client, actions.move_window_to_tiling(wid))
+            wid_int = wid
+            await _request(ports.client, actions.move_window_to_tiling(wid_int))
             try:
                 await _wait(
                     ports.state,
-                    lambda snap: (w := snap.windows.get(wid)) is not None and not w.is_floating,
+                    lambda snap: (w := snap.windows.get(wid_int)) is not None and not w.is_floating,
                     timeout=1.5,
                 )
             except WaitTimeoutError:
@@ -166,18 +171,20 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                 step=step,
                 outcome=StepOutcome.COMPLETED,
                 message="window set tiling",
-                window_id=wid,
+                window_id=wid_int,
             )
         case SetFullscreenStep():
             wid = _resolve_window_id(step, runtime)
             if wid is None:
                 return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
-            await _request(ports.client, actions.fullscreen_window(wid))
+            wid_int = wid
+            fullscreen = step.fullscreen
+            await _request(ports.client, actions.fullscreen_window(wid_int))
             try:
                 await _wait(
                     ports.state,
-                    lambda snap: (w := snap.windows.get(wid)) is not None
-                    and getattr(w, "is_fullscreen", False) == step.fullscreen,
+                    lambda snap: (w := snap.windows.get(wid_int)) is not None
+                    and getattr(w, "is_fullscreen", False) == fullscreen,
                     timeout=1.5,
                 )
             except WaitTimeoutError:
@@ -186,18 +193,20 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                 step=step,
                 outcome=StepOutcome.COMPLETED,
                 message="fullscreen toggled",
-                window_id=wid,
+                window_id=wid_int,
             )
         case SetMaximizedStep():
             wid = _resolve_window_id(step, runtime)
             if wid is None:
                 return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
-            await _request(ports.client, actions.maximize_window_to_edges(wid))
+            wid_int = wid
+            maximized = step.maximized
+            await _request(ports.client, actions.maximize_window_to_edges(wid_int))
             try:
                 await _wait(
                     ports.state,
-                    lambda snap: (w := snap.windows.get(wid)) is not None
-                    and getattr(w, "is_maximized", False) == step.maximized,
+                    lambda snap: (w := snap.windows.get(wid_int)) is not None
+                    and getattr(w, "is_maximized", False) == maximized,
                     timeout=1.5,
                 )
             except WaitTimeoutError:
@@ -206,7 +215,7 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                 step=step,
                 outcome=StepOutcome.COMPLETED,
                 message="maximized toggled",
-                window_id=wid,
+                window_id=wid_int,
             )
         case SetColumnWidthStep():
             wid = _resolve_window_id(step, runtime)

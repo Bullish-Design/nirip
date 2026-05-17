@@ -1,8 +1,8 @@
 import asyncio
 from types import SimpleNamespace
 
-from nirip.execution.handlers import execute_step
 from nirip.execution.executor import execute_plan
+from nirip.execution.handlers import execute_step
 from nirip.execution.models import SessionPorts
 from nirip.execution.runtime import AppRuntimeState, SessionRuntime
 from nirip.planning.models import FocusWorkspaceStep, Plan, WaitForWindowStep

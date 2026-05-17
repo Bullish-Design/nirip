@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from nirip.errors import PlanningError
 from nirip.planning.models import (
     EnsureWorkspaceStep,
     FocusWindowStep,
@@ -23,8 +24,14 @@ from nirip.planning.models import (
     WaitForWindowStep,
 )
 from nirip.planning.ordering import topological_sort
-from nirip.errors import PlanningError
-from nirip.resolve.models import AppResolution, DriftKind, NormalizedApp, NormalizedSession, Resolution, ResolutionStatus
+from nirip.resolve.models import (
+    AppResolution,
+    DriftKind,
+    NormalizedApp,
+    NormalizedSession,
+    Resolution,
+    ResolutionStatus,
+)
 
 
 def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
