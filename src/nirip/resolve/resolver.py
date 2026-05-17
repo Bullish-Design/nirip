@@ -43,15 +43,12 @@ def resolve(normalized: NormalizedSession, snapshot: Snapshot) -> Resolution:
                 window = snapshot.windows[decision.assigned_window_id]
                 drift = _detect_drift(window, napp, nws.name, ws_by_name)
                 status = ResolutionStatus.DRIFTED if drift else ResolutionStatus.MATCHED
-                action_required = bool(drift)
             else:
                 drift = []
                 if napp.optional:
                     status = ResolutionStatus.OPTIONAL_MISSING
-                    action_required = False
                 else:
                     status = ResolutionStatus.MISSING
-                    action_required = normalized.options.launch_missing
 
             if decision.is_ambiguous:
                 status = ResolutionStatus.AMBIGUOUS
@@ -62,7 +59,6 @@ def resolve(normalized: NormalizedSession, snapshot: Snapshot) -> Resolution:
                 status=status,
                 match_decision=decision,
                 drift=drift,
-                action_required=action_required,
             )
             app_resolutions.append(ar)
 

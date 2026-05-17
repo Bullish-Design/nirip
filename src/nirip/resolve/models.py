@@ -89,12 +89,6 @@ class AppResolution(NiripModel):
     status: ResolutionStatus
     match_decision: MatchDecision
     drift: list[DriftItem]
-    action_required: bool
-
-    @computed_field
-    @property
-    def needs_spawn(self) -> bool:
-        return self.status == ResolutionStatus.MISSING and self.action_required
 
     @computed_field
     @property
@@ -137,9 +131,9 @@ class Resolution(NiripModel):
         for wr in self.workspace_resolutions:
             if not wr.exists or not wr.output_correct:
                 return True
-            if any(ar.action_required for ar in wr.app_resolutions):
+            if any(ar.status in (ResolutionStatus.DRIFTED, ResolutionStatus.MISSING) for ar in wr.app_resolutions):
                 return True
-        return any(ar.status == ResolutionStatus.MISSING for ar in self.all_app_resolutions)
+        return False
 
     @computed_field
     @property

@@ -21,13 +21,29 @@ from nirip.planning.models import (
 )
 from nirip.planning.ordering import topological_sort
 from nirip.resolve.models import (
-    AppResolution,
     DriftKind,
     NormalizedApp,
     NormalizedSession,
+    AppResolution,
     Resolution,
     ResolutionStatus,
 )
+from nirip.spec.models import SessionOptions
+
+
+def _should_act(ar: AppResolution, options: SessionOptions) -> bool:
+    """Policy: determine if this app resolution requires action."""
+    match ar.status:
+        case ResolutionStatus.MATCHED:
+            return False
+        case ResolutionStatus.OPTIONAL_MISSING:
+            return False
+        case ResolutionStatus.MISSING:
+            return options.launch_missing
+        case ResolutionStatus.DRIFTED:
+            return True
+        case ResolutionStatus.AMBIGUOUS:
+            return False
 
 
 def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
@@ -64,7 +80,7 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
             )
 
         for ar in wr.app_resolutions:
-            if not ar.action_required:
+            if not _should_act(ar, normalized.options):
                 continue
 
             napp = normalized.app_index[f"{wr.name}/{ar.app_name}"]
@@ -72,7 +88,7 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
             placement_deps = list(base_deps)
             wid = ar.match_decision.assigned_window_id
 
-            if ar.needs_spawn and napp.spawn:
+            if ar.status == ResolutionStatus.MISSING and napp.spawn:
                 spawn_id = next_id("spawn")
                 wait_id = next_id("wait")
                 steps.append(
@@ -101,7 +117,7 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                 )
                 placement_deps = [wait_id]
 
-            if ar.needs_move or ar.needs_spawn:
+            if ar.needs_move or ar.status == ResolutionStatus.MISSING:
                 steps.append(
                     MoveWindowToWorkspaceStep(
                         id=next_id("move"),
@@ -114,7 +130,7 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                     )
                 )
 
-            needs_float_or_tile_correction = ar.needs_spawn or any(
+            needs_float_or_tile_correction = ar.status == ResolutionStatus.MISSING or any(
                 d.kind == DriftKind.WRONG_FLOATING for d in ar.drift
             )
             if needs_float_or_tile_correction:
@@ -131,7 +147,7 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                     )
                 )
 
-            if ar.needs_spawn or any(d.kind == DriftKind.WRONG_FULLSCREEN for d in ar.drift):
+            if ar.status == ResolutionStatus.MISSING or any(d.kind == DriftKind.WRONG_FULLSCREEN for d in ar.drift):
                 steps.append(
                     SetWindowStateStep(
                         id=next_id("state"),
@@ -145,7 +161,7 @@ def compile_plan(resolution: Resolution, normalized: NormalizedSession) -> Plan:
                     )
                 )
 
-            if ar.needs_spawn or any(d.kind == DriftKind.WRONG_MAXIMIZED for d in ar.drift):
+            if ar.status == ResolutionStatus.MISSING or any(d.kind == DriftKind.WRONG_MAXIMIZED for d in ar.drift):
                 steps.append(
                     SetWindowStateStep(
                         id=next_id("state"),

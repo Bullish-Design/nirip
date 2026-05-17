@@ -40,7 +40,6 @@ def _make_resolution(status: ResolutionStatus, wid: int | None = None) -> tuple[
         status=status,
         match_decision=decision,
         drift=[],
-        action_required=True,
     )
     wr = WorkspaceResolution(
         name="dev",

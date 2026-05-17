@@ -50,7 +50,6 @@ def test_depends_on_enforces_ordering() -> None:
                 reasons=["test"],
             ),
             drift=[],
-            action_required=True,
         )
 
     wr = WorkspaceResolution(
