@@ -7,7 +7,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel, Field, model_validator
 
-from nirip.resolve import AppResolution, DriftKind, Resolution, ResolutionStatus, WorkspaceState
+from nirip.resolve import AppResolution, DriftKind, Resolution, ResolutionStatus, STATE_PROPERTY_MAP, WorkspaceState
 from nirip.spec import _FROZEN, MatchRule, NiripError, SessionOptions
 
 
@@ -93,10 +93,14 @@ class Plan(BaseModel):
         return not self.steps
 
 
+_PROP_TO_WINDOW_PROPERTY: dict[str, tuple[WindowProperty, WindowProperty | None]] = {
+    "floating": (WindowProperty.FLOATING, WindowProperty.TILING),
+    "fullscreen": (WindowProperty.FULLSCREEN, None),
+    "maximized": (WindowProperty.MAXIMIZED, None),
+}
+
 _STATE_DRIFT_MAP: list[tuple[DriftKind, str, WindowProperty, WindowProperty | None]] = [
-    (DriftKind.WRONG_FLOATING, "floating", WindowProperty.FLOATING, WindowProperty.TILING),
-    (DriftKind.WRONG_FULLSCREEN, "fullscreen", WindowProperty.FULLSCREEN, None),
-    (DriftKind.WRONG_MAXIMIZED, "maximized", WindowProperty.MAXIMIZED, None),
+    (prop.drift_kind, prop.placement_attr, *_PROP_TO_WINDOW_PROPERTY[prop.placement_attr]) for prop in STATE_PROPERTY_MAP
 ]
 
 

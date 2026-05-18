@@ -122,6 +122,21 @@ class _Assignment(NamedTuple):
     is_ambiguous: bool
 
 
+class StatePropMapping(NamedTuple):
+    """Canonical mapping between drift kinds and window/placement properties."""
+
+    drift_kind: DriftKind
+    window_attr: str
+    placement_attr: str
+
+
+STATE_PROPERTY_MAP: list[StatePropMapping] = [
+    StatePropMapping(DriftKind.WRONG_FLOATING, "is_floating", "floating"),
+    StatePropMapping(DriftKind.WRONG_FULLSCREEN, "is_fullscreen", "fullscreen"),
+    StatePropMapping(DriftKind.WRONG_MAXIMIZED, "is_maximized", "maximized"),
+]
+
+
 def evaluate_rule(rule: MatchRule, window: Window) -> tuple[bool, MatchTier]:
     """Evaluate a match rule against a window."""
     best_tier = MatchTier.NONE
@@ -286,13 +301,6 @@ def resolve(spec: SessionSpec, snapshot: Snapshot) -> Resolution:
     return Resolution(session_name=spec.name, workspaces=workspaces, apps=apps, warnings=[])
 
 
-_PROPERTY_CHECKS: list[tuple[DriftKind, str, str]] = [
-    (DriftKind.WRONG_FLOATING, "is_floating", "floating"),
-    (DriftKind.WRONG_FULLSCREEN, "is_fullscreen", "fullscreen"),
-    (DriftKind.WRONG_MAXIMIZED, "is_maximized", "maximized"),
-]
-
-
 def _detect_drift(
     window: Window,
     app_spec: AppSpec,
@@ -311,10 +319,10 @@ def _detect_drift(
             )
         )
 
-    for kind, win_attr, place_attr in _PROPERTY_CHECKS:
-        current_val: Any = getattr(window, win_attr, False)
-        desired_val: Any = getattr(app_spec.placement, place_attr)
+    for prop in STATE_PROPERTY_MAP:
+        current_val: Any = getattr(window, prop.window_attr, False)
+        desired_val: Any = getattr(app_spec.placement, prop.placement_attr)
         if current_val != desired_val:
-            drift.append(DriftItem(kind=kind, current=str(current_val), desired=str(desired_val)))
+            drift.append(DriftItem(kind=prop.drift_kind, current=str(current_val), desired=str(desired_val)))
 
     return drift
