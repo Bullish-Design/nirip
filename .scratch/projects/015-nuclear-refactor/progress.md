@@ -5,7 +5,7 @@
 - [x] Step 3: Implemented `src/nirip/plan.py` (unified steps, plan builder, topo sort).
 - [x] Step 4: Implemented `src/nirip/execute.py` (async engine, handlers, hooks, runtime state).
 - [x] Step 5: Implemented `src/nirip/capture.py` (snapshot to SessionSpec capture).
-- [ ] Step 6: Implement `src/nirip/cli.py`.
+- [x] Step 6: Implemented `src/nirip/cli.py` (commands, formatting, parser, main).
 - [ ] Step 7: Implement `src/nirip/__init__.py`.
 - [ ] Step 8: Verify `src/nirip/__main__.py` entry.
 - [ ] Step 9: Delete legacy code (already absent in this branch, verify final state).
