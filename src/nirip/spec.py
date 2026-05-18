@@ -247,15 +247,22 @@ def _check_weak_matchers(spec: SessionSpec, warnings: list[str]) -> None:
 
 
 def _check_inter_app_conflicts(spec: SessionSpec, warnings: list[str]) -> None:
-    signatures: dict[tuple[str, str, str, str, int | None], list[str]] = {}
+    _EMPTY = ("", "", "", "", "")
+    signatures: dict[tuple[str, str, str, str, str], list[str]] = {}
     for ws in spec.workspaces:
         for app in ws.apps:
             m = app.match
-            key = (m.app_id or "", m.app_id_regex or "", m.title or "", m.title_regex or "", m.pid)
+            key = (
+                m.app_id or "",
+                m.app_id_regex or "",
+                m.title or "",
+                m.title_regex or "",
+                str(m.pid) if m.pid is not None else "",
+            )
             signatures.setdefault(key, []).append(f"{ws.name}/{app.name}")
 
     for key, owners in signatures.items():
-        if len(owners) > 1 and key != ("", "", "", "", None):
+        if len(owners) > 1 and key != _EMPTY:
             warnings.append(f"potential matcher conflict: {', '.join(owners)}")
 
 
