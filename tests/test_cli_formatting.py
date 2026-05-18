@@ -17,6 +17,13 @@ def test_format_diff_with_spawn() -> None:
     assert "+ dev/firefox" in output
 
 
+def test_format_diff_with_optional_missing() -> None:
+    diff = SessionDiff(session_name="test", optional_missing=["dev/slack"])
+    output = format_diff(diff)
+    assert "Optional (not running): 1" in output
+    assert "? dev/slack" in output
+
+
 def test_format_plan_empty() -> None:
     resolution = Resolution(
         session_name="test",

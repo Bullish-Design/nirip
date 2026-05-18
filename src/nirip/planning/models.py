@@ -136,6 +136,7 @@ class SessionDiff(NiripModel):
     will_spawn: list[str] = Field(default_factory=list)
     will_move: list[str] = Field(default_factory=list)
     drifted: list[str] = Field(default_factory=list)
+    optional_missing: list[str] = Field(default_factory=list)
     workspace_changes: list[str] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     errors: list[str] = Field(default_factory=list)
@@ -143,7 +144,13 @@ class SessionDiff(NiripModel):
     @computed_field
     @property
     def has_drift(self) -> bool:
-        return bool(self.will_spawn or self.will_move or self.drifted or self.workspace_changes)
+        return bool(
+            self.will_spawn
+            or self.optional_missing
+            or self.will_move
+            or self.drifted
+            or self.workspace_changes
+        )
 
     @computed_field
     @property

@@ -17,6 +17,10 @@ def format_diff(diff: SessionDiff) -> str:
         lines.append("Will spawn:")
         for app in diff.will_spawn:
             lines.append(f"  + {app}")
+    if diff.optional_missing:
+        lines.append(f"Optional (not running): {len(diff.optional_missing)}")
+        for app in diff.optional_missing:
+            lines.append(f"  ? {app}")
     if diff.will_move:
         lines.append("Will move:")
         for app in diff.will_move:

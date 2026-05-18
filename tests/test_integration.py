@@ -30,3 +30,15 @@ def test_pipeline_planning() -> None:
     diff = compile_diff(resolution)
     assert plan.session_name == "s"
     assert diff.session_name == "s"
+
+
+def test_compile_diff_reports_optional_missing() -> None:
+    app = AppSpec(name="a", match=MatchRule(app_id="x"), optional=True)
+    spec = SessionSpec(
+        name="s",
+        workspaces=[WorkspaceSpec(name="w", apps=[app])],
+    )
+    snap = SimpleNamespace(windows={}, workspaces={})
+    resolution = resolve(spec, snap)
+    diff = compile_diff(resolution)
+    assert diff.optional_missing == ["w/a"]

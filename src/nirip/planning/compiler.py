@@ -301,6 +301,8 @@ def compile_diff(resolution: Resolution) -> SessionDiff:
             label = f"{wr.name}/{ar.app_name}"
             if ar.status == ResolutionStatus.MATCHED:
                 diff.already_matched.append(label)
+            elif ar.status == ResolutionStatus.OPTIONAL_MISSING:
+                diff.optional_missing.append(label)
             elif ar.status == ResolutionStatus.MISSING:
                 diff.will_spawn.append(label)
             elif ar.status == ResolutionStatus.DRIFTED:
