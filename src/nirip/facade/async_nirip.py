@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from typing import Any
 
 from niri_pypc import NiriClient
@@ -26,10 +28,15 @@ class AsyncNirip:
         self._config = config or NiripConfig()
 
     @classmethod
-    async def open(cls, config: NiripConfig | None = None) -> AsyncNirip:
+    @asynccontextmanager
+    async def open(cls, config: NiripConfig | None = None) -> AsyncIterator[AsyncNirip]:
         state = await NiriState.open()
         client = NiriClient.create()
-        return cls(state=state, client=client, config=config)
+        instance = cls(state=state, client=client, config=config)
+        try:
+            yield instance
+        finally:
+            await instance.close()
 
     @property
     def snapshot(self) -> Snapshot:

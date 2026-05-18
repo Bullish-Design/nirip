@@ -18,7 +18,7 @@ async def cmd_apply(session_file: str, *, yes: bool = False, dry_run: bool = Fal
     for w in validated.validation.warnings:
         print(f"  warning: {w}", file=sys.stderr)
 
-    async with await AsyncNirip.open() as nirip:
+    async with AsyncNirip.open() as nirip:
         if dry_run:
             plan = await nirip.plan(validated.spec)
             return format_plan(plan)
@@ -37,20 +37,20 @@ async def cmd_apply(session_file: str, *, yes: bool = False, dry_run: bool = Fal
 
 async def cmd_diff(session_file: str) -> str:
     validated = load_spec_from_file(session_file)
-    async with await AsyncNirip.open() as nirip:
+    async with AsyncNirip.open() as nirip:
         diff = await nirip.diff(validated.spec)
         return format_diff(diff)
 
 
 async def cmd_plan(session_file: str) -> str:
     validated = load_spec_from_file(session_file)
-    async with await AsyncNirip.open() as nirip:
+    async with AsyncNirip.open() as nirip:
         plan = await nirip.plan(validated.spec)
         return format_plan(plan)
 
 
 async def cmd_capture(*, name: str | None = None, output: str | None = None) -> str:
-    async with await AsyncNirip.open() as nirip:
+    async with AsyncNirip.open() as nirip:
         captured = await nirip.capture(name=name)
         text = yaml.dump(captured.spec.model_dump(), default_flow_style=False)
         if output:

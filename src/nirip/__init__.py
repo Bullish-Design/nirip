@@ -37,7 +37,7 @@ def load_session(path: str | Path) -> ValidatedSpec:
 
 def apply_session(spec: SessionSpec, config: NiripConfig | None = None) -> ApplyResult:
     async def _run() -> ApplyResult:
-        async with await AsyncNirip.open(config) as nirip:
+        async with AsyncNirip.open(config) as nirip:
             return await nirip.apply(spec)
 
     return asyncio.run(_run())
@@ -47,7 +47,7 @@ def plan_session(spec: SessionSpec, config: NiripConfig | None = None) -> Plan:
     """One-shot sync plan."""
 
     async def _run() -> Plan:
-        async with await AsyncNirip.open(config) as nirip:
+        async with AsyncNirip.open(config) as nirip:
             return await nirip.plan(spec)
 
     return asyncio.run(_run())
@@ -57,7 +57,7 @@ def diff_session(spec: SessionSpec, config: NiripConfig | None = None) -> Sessio
     """One-shot sync diff."""
 
     async def _run() -> SessionDiff:
-        async with await AsyncNirip.open(config) as nirip:
+        async with AsyncNirip.open(config) as nirip:
             return await nirip.diff(spec)
 
     return asyncio.run(_run())
