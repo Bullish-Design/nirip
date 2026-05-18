@@ -8,7 +8,6 @@ from typing import Any
 import yaml
 
 from nirip.errors import SpecError, SpecValidationError
-from nirip.spec.defaults import apply_defaults
 from nirip.spec.models import SessionSpec
 from nirip.spec.validators import ValidatedSpec, validate_session
 
@@ -37,7 +36,6 @@ def load_spec_from_dict(data: dict[str, Any], *, source: str = "<dict>") -> Vali
     except Exception as e:
         raise SpecError(f"spec parse error in {source}: {e}") from e
 
-    spec = apply_defaults(spec)
     validation = validate_session(spec)
 
     if not validation.valid:

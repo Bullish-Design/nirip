@@ -1,7 +1,6 @@
 import pytest
 
-from nirip.planning.models import CreateWorkspaceStep, MoveWindowToWorkspaceStep
-from nirip.planning.models import ResizeAxis, ResizeWindowStep
+from nirip.planning.models import CreateWorkspaceStep, MoveWindowToWorkspaceStep, ResizeAxis, ResizeWindowStep
 
 
 def test_plan_step_discriminator_roundtrip() -> None:
