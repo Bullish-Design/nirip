@@ -19,24 +19,9 @@ key = (m.app_id or "", m.app_id_regex or "", m.title or "", m.title_regex or "",
 
 The check `key != ("", "", "", "", None)` means an entirely empty match rule (which is already rejected by the model validator) would silently pass. This is fine in practice but the logic is awkward — the `None`-vs-`""` mixed sentinel is a minor smell.
 
-### 1.6 [SIMPLIFY] Validation functions take mutable lists as out-params
-
-Every `_check_*` function mutates external `errors` and `warnings` lists. This is a C-style pattern. A more Pythonic approach: each returns its own list, and the caller concatenates. But this is a *style* preference — the current approach works fine and avoids allocation. Acknowledge it as a deliberate choice.
 
 ---
 
-### 2.2 [DESIGN] `_assign` is O(A × W) with an O(A × W log(A × W)) sort
-
-The assignment algorithm builds all (app, window, tier) triples, sorts them, then greedily assigns. This is fine for desktop-scale data (tens of apps, hundreds of windows). But it's worth noting: for N apps and M windows, it's O(NM log NM). The v1 `GreedyAssigner` was the same, so no regression.
-
-### 2.4 [CORRECTNESS] `resolve()` accesses `snapshot.windows[window_id]` without guard
-
-```python
-if window_id is not None:
-    window = snapshot.windows[window_id]
-```
-
-If `_assign` returns a `window_id` that the snapshot no longer contains (theoretically impossible if the snapshot is immutable, but the type system doesn't guarantee it), this raises `KeyError` with no context. A `.get()` with an appropriate error would be more defensive.
 
 ### 2.5 [CONSISTENCY] `ws_by_name` type annotation says `Workspace` but it's `Any` at runtime
 
@@ -49,11 +34,11 @@ def _detect_drift(
 ) -> list[DriftItem]:
 ```
 
-In tests, `FakeWorkspace` is passed. The type annotation `Workspace` is from `niri_pypc.types.generated.models` but the function uses duck typing (`.id`, `.output`). This is fine for duck-typing, but the import of `Workspace` at module level is then only used for this annotation. Could use a `Protocol` or just annotate as `Any`.
+In tests, `FakeWorkspace` is passed. The type annotation `Workspace` is from `niri_pypc.types.generated.models` but the function uses duck typing (`.id`, `.output`). This is fine for duck-typing, but the import of `Workspace` at module level is then only used for this annotation. Could use a `Protocol` to fix?
 
 ### 2.6 [SIMPLIFY] `_PROPERTY_CHECKS` table in resolve vs `_STATE_DRIFT_MAP` table in plan
 
-Two different lookup tables for the same conceptual mapping (drift kind → window property). `_PROPERTY_CHECKS` maps `(DriftKind, win_attr, place_attr)`. `_STATE_DRIFT_MAP` maps `(DriftKind, place_attr, true_prop, false_prop)`. They encode the same domain knowledge in different shapes. This is a subtle duplication of the "floating/fullscreen/maximized" mapping.
+Two different lookup tables for the same conceptual mapping (drift kind → window property). `_PROPERTY_CHECKS` maps `(DriftKind, win_attr, place_attr)`. `_STATE_DRIFT_MAP` maps `(DriftKind, place_attr, true_prop, false_prop)`. They encode the same domain knowledge in different shapes. This is a subtle duplication of the "floating/fullscreen/maximized" mapping. Can this be abstracted and extracted for additional simplicity?
 
 ---
 
@@ -104,28 +89,3 @@ env.update(step.env)
 Fine — just noting the import is minimal usage.
 
 ---
-
-### 5.1 [DESIGN] Cleanest file in the codebase
-
-Nothing to critique. 37 lines, clear purpose, no unnecessary abstraction. This is the reference standard the other files should aspire to.
-
-### 6.4 [SIMPLIFY] `cmd_apply` calls `build_plan` twice (confirmation path)
-
-```python
-if not yes and resolution.has_drift:
-    print(format_resolution(resolution), file=sys.stderr)
-    answer = await asyncio.to_thread(input, "Apply? [y/N] ")
-    if answer.lower() != "y":
-        return "Aborted."
-
-plan = build_plan(resolution, spec.options)  # always builds, even after confirmation
-```
-
-If the user confirms, `build_plan` runs once. If `dry_run`, it runs once. There's no double-build. Actually, this is fine on re-reading — the confirmation path shows the *resolution*, not the plan. No issue here. *(Self-correction.)*
-
-### 7.2 [SIMPLIFY] `__all__` is well-curated
-
-Good: exactly the right symbols. No over-export, no under-export. The public API is: 2 errors, 3 domain types, 4 pipeline functions, 1 convenience function. Clean.
-
----
-
