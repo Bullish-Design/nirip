@@ -208,6 +208,8 @@ def _placement_steps(
     emit: EmitFn,
 ) -> None:
     if ar.needs_move or ar.status == ResolutionStatus.MISSING:
+        # window_id may be None for MISSING apps; the executor resolves it from
+        # matched_window_id populated by an earlier WAIT_FOR_WINDOW dependency.
         emit(
             StepKind.MOVE_WINDOW,
             f"move {ar.app_name} to '{ws_name}'",
@@ -352,6 +354,31 @@ def _topological_sort(steps: list[PlanStep]) -> list[PlanStep]:
     return ordered
 
 
+def _validate_window_id_contracts(steps: list[PlanStep]) -> None:
+    """Ensure runtime-resolved window ids have a WAIT_FOR_WINDOW dependency ancestor."""
+    needs_wid = {StepKind.MOVE_WINDOW, StepKind.SET_STATE, StepKind.RESIZE, StepKind.FOCUS_WINDOW}
+    wait_steps = {step.id for step in steps if step.kind == StepKind.WAIT_FOR_WINDOW}
+    dep_map = {step.id: set(step.depends_on) for step in steps}
+
+    def has_wait_ancestor(step_id: str, visited: set[str] | None = None) -> bool:
+        if visited is None:
+            visited = set()
+        if step_id in visited:
+            return False
+        visited.add(step_id)
+        if step_id in wait_steps:
+            return True
+        return any(has_wait_ancestor(dep, visited) for dep in dep_map.get(step_id, set()))
+
+    for step in steps:
+        if step.kind in needs_wid and step.window_id is None:
+            if not has_wait_ancestor(step.id):
+                raise NiripError(
+                    f"step {step.id} ({step.kind.value}) has no window_id and no "
+                    "WAIT_FOR_WINDOW in dependency chain"
+                )
+
+
 def build_plan(resolution: Resolution, options: SessionOptions) -> Plan:
     steps: list[PlanStep] = []
     counter = 0
@@ -386,6 +413,7 @@ def build_plan(resolution: Resolution, options: SessionOptions) -> Plan:
             emit(StepKind.FOCUS_WORKSPACE, f"focus workspace '{ws.name}'", workspace_name=ws.name)
 
     steps = _wire_dependencies(steps, app_first, app_last, resolution)
+    _validate_window_id_contracts(steps)
 
     return Plan(
         session_name=resolution.session_name,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from nirip.plan import PlanStep, StepKind, _parse_size, _topological_sort, build_plan
+from nirip.plan import PlanStep, StepKind, _parse_size, _topological_sort, _validate_window_id_contracts, build_plan
 from nirip.resolve import DriftItem, DriftKind, Resolution, ResolutionStatus, WorkspaceState
 from nirip.spec import AppSpec, MatchRule, NiripError, SessionOptions
 
@@ -111,3 +111,54 @@ def test_build_plan_adds_placement_and_workspace_dependencies() -> None:
     first_b = next(s for s in plan.steps if s.app_name == "b")
     last_a = [s.id for s in plan.steps if s.app_name == "a"][-1]
     assert last_a in first_b.depends_on
+
+
+def test_build_plan_missing_move_depends_on_wait_transitively() -> None:
+    resolution = Resolution(
+        session_name="dev",
+        workspaces=[
+            WorkspaceState(
+                name="code",
+                exists=True,
+                output_correct=True,
+                desired_output=None,
+                current_output="DP-1",
+                focus=False,
+            )
+        ],
+        apps=[_app("firefox", ResolutionStatus.MISSING)],
+    )
+    plan = build_plan(resolution, SessionOptions())
+    move = next(s for s in plan.steps if s.kind == StepKind.MOVE_WINDOW and s.app_name == "firefox")
+    wait = next(s for s in plan.steps if s.kind == StepKind.WAIT_FOR_WINDOW and s.app_name == "firefox")
+
+    by_id = {s.id: s for s in plan.steps}
+    stack = [move.id]
+    seen: set[str] = set()
+    found = False
+    while stack:
+        sid = stack.pop()
+        if sid in seen:
+            continue
+        seen.add(sid)
+        if sid == wait.id:
+            found = True
+            break
+        stack.extend(by_id[sid].depends_on)
+    assert found is True
+
+
+def test_validate_window_id_contracts_raises_without_wait_dependency() -> None:
+    steps = [
+        PlanStep(
+            id="move-1",
+            kind=StepKind.MOVE_WINDOW,
+            description="move app",
+            app_name="firefox",
+            workspace_name="code",
+            window_id=None,
+            depends_on=[],
+        )
+    ]
+    with pytest.raises(NiripError, match="no window_id and no WAIT_FOR_WINDOW"):
+        _validate_window_id_contracts(steps)
