@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict, deque
 from enum import StrEnum
+from typing import Protocol, TypedDict, Unpack
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -93,6 +94,29 @@ class Plan(BaseModel):
         return not self.steps
 
 
+class _StepParams(TypedDict, total=False):
+    app_name: str | None
+    workspace_name: str | None
+    window_id: int | None
+    command: list[str] | str | None
+    cwd: str | None
+    env: dict[str, str]
+    shell: bool
+    match: MatchRule | None
+    timeout_s: float | None
+    target_output: str | None
+    property: WindowProperty | None
+    value: bool
+    axis: ResizeAxis | None
+    proportion: float | None
+    pixels: int | None
+    depends_on: list[str]
+
+
+class EmitFn(Protocol):
+    def __call__(self, kind: StepKind, description: str, **kwargs: Unpack[_StepParams]) -> str: ...
+
+
 _PROP_TO_WINDOW_PROPERTY: dict[str, tuple[WindowProperty, WindowProperty | None]] = {
     "floating": (WindowProperty.FLOATING, WindowProperty.TILING),
     "fullscreen": (WindowProperty.FULLSCREEN, None),
@@ -120,7 +144,10 @@ def _should_act(ar: AppResolution, options: SessionOptions) -> bool:
             raise ValueError(f"unhandled status: {ar.status}")
 
 
-def _workspace_steps(ws: WorkspaceState, emit) -> list[str]:
+def _workspace_steps(
+    ws: WorkspaceState,
+    emit: EmitFn,
+) -> list[str]:
     if not ws.exists:
         sid = emit(
             StepKind.CREATE_WORKSPACE,
@@ -142,7 +169,12 @@ def _workspace_steps(ws: WorkspaceState, emit) -> list[str]:
     return []
 
 
-def _spawn_steps(ar: AppResolution, ws_name: str, base_deps: list[str], emit) -> list[str]:
+def _spawn_steps(
+    ar: AppResolution,
+    ws_name: str,
+    base_deps: list[str],
+    emit: EmitFn,
+) -> list[str]:
     if ar.spec.spawn is None:
         return list(base_deps)
 
@@ -169,7 +201,12 @@ def _spawn_steps(ar: AppResolution, ws_name: str, base_deps: list[str], emit) ->
     return [wait_id]
 
 
-def _placement_steps(ar: AppResolution, ws_name: str, deps: list[str], emit) -> None:
+def _placement_steps(
+    ar: AppResolution,
+    ws_name: str,
+    deps: list[str],
+    emit: EmitFn,
+) -> None:
     if ar.needs_move or ar.status == ResolutionStatus.MISSING:
         emit(
             StepKind.MOVE_WINDOW,
@@ -321,7 +358,7 @@ def build_plan(resolution: Resolution, options: SessionOptions) -> Plan:
     app_first: dict[str, str] = {}
     app_last: dict[str, str] = {}
 
-    def emit(kind: StepKind, description: str, **kwargs) -> str:
+    def emit(kind: StepKind, description: str, **kwargs: Unpack[_StepParams]) -> str:
         nonlocal counter
         counter += 1
         sid = f"{kind.value}-{counter}"
