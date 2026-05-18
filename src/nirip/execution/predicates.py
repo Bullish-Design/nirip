@@ -4,20 +4,13 @@ from __future__ import annotations
 
 from niri_state import Snapshot
 
+from nirip.execution._checks import STATE_CHECKS
 from nirip.planning.models import (
     CreateWorkspaceStep,
     MoveWindowToWorkspaceStep,
     PlanStep,
     SetWindowStateStep,
-    WindowProperty,
 )
-
-_STATE_CHECKS = {
-    WindowProperty.FLOATING: lambda w: w.is_floating,
-    WindowProperty.TILING: lambda w: not w.is_floating,
-    WindowProperty.FULLSCREEN: lambda w: getattr(w, "is_fullscreen", False),
-    WindowProperty.MAXIMIZED: lambda w: getattr(w, "is_maximized", False),
-}
 
 
 def is_already_satisfied(step: PlanStep, snapshot: Snapshot) -> bool:
@@ -38,6 +31,6 @@ def is_already_satisfied(step: PlanStep, snapshot: Snapshot) -> bool:
             w = snapshot.windows.get(step.window_id)
             if w is None:
                 return False
-            return _STATE_CHECKS[step.property](w) == step.value
+            return STATE_CHECKS[step.property](w) == step.value
         case _:
             return False

@@ -12,6 +12,7 @@ from niri_state import NiriState, Snapshot, WaitTimeoutError
 from niri_state.api.config import NiriStateConfig
 from niri_state.api.waiters import wait_until
 
+from nirip.execution._checks import STATE_CHECKS
 from nirip.execution.models import SessionPorts, StepOutcome, StepResult
 from nirip.execution.predicates import is_already_satisfied
 from nirip.execution.runtime import SessionRuntime
@@ -46,14 +47,6 @@ _STATE_ACTIONS: dict[WindowProperty, Callable[[int], Any]] = {
     WindowProperty.FULLSCREEN: actions.fullscreen_window,
     WindowProperty.MAXIMIZED: actions.maximize_window_to_edges,
 }
-
-_STATE_CHECKS: dict[WindowProperty, Callable[[Any], bool]] = {
-    WindowProperty.FLOATING: lambda w: w.is_floating,
-    WindowProperty.TILING: lambda w: not w.is_floating,
-    WindowProperty.FULLSCREEN: lambda w: getattr(w, "is_fullscreen", False),
-    WindowProperty.MAXIMIZED: lambda w: getattr(w, "is_maximized", False),
-}
-
 
 async def _wait(state: NiriState, predicate: Callable[[Snapshot], bool], timeout: float) -> Snapshot:
     return await wait_until(state, predicate, config=_WAIT_CONFIG, timeout=timeout)
@@ -150,7 +143,7 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
             if wid is None:
                 return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
             await _request(ports.client, _STATE_ACTIONS[step.property](wid))
-            check = _STATE_CHECKS[step.property]
+            check = STATE_CHECKS[step.property]
             target_val = step.value
             try:
                 await _wait(
