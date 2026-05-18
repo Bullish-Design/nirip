@@ -39,7 +39,7 @@ class MatchDecision(NiripModel):
     def is_ambiguous(self) -> bool:
         if len(self.candidates) < 2:
             return False
-        tiers = [MatchTier(c.tier) for c in self.candidates]
+        tiers = [c.tier for c in self.candidates]
         top = max(tiers)
         return sum(1 for tier in tiers if tier == top) > 1
 

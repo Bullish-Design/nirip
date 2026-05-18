@@ -15,5 +15,4 @@ class NiripModel(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
         frozen=True,
-        use_enum_values=True,
     )

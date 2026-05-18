@@ -98,7 +98,7 @@ def assign_windows(apps: list[tuple[str, AppSpec]], windows: Iterable[Window]) -
     triples: list[tuple[int, int, MatchTier]] = []
     for app_idx, candidates in enumerate(all_candidates):
         for c in candidates:
-            triples.append((app_idx, c.window_id, MatchTier(c.tier)))
+            triples.append((app_idx, c.window_id, c.tier))
     triples.sort(key=lambda t: t[2], reverse=True)
 
     assigned_app: set[int] = set()
@@ -120,7 +120,7 @@ def assign_windows(apps: list[tuple[str, AppSpec]], windows: Iterable[Window]) -
         reasons: list[str] = []
 
         if wid is not None:
-            tier = next(MatchTier(c.tier) for c in candidates if c.window_id == wid)
+            tier = next(c.tier for c in candidates if c.window_id == wid)
             reasons.append(f"assigned window {wid} (tier {tier.name})")
         elif candidates:
             reasons.append(f"{len(candidates)} candidate(s) all claimed by higher-tier matches")
