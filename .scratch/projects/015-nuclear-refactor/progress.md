@@ -8,7 +8,7 @@
 - [x] Step 6: Implemented `src/nirip/cli.py` (commands, formatting, parser, main).
 - [x] Step 7: Implemented `src/nirip/__init__.py` (new public API, sync apply_session).
 - [x] Step 8: Updated `src/nirip/__main__.py` to v2 cli entrypoint.
-- [ ] Step 9: Delete legacy code (already absent in this branch, verify final state).
+- [x] Step 9: Verified legacy package tree removed; only flat v2 modules remain.
 - [ ] Step 10: Build new v2 test suite from scratch.
 - [ ] Step 11: Optional version bump in `pyproject.toml`.
 - [ ] Step 12: Final validation suite.
