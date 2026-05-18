@@ -6,13 +6,27 @@ import re
 from collections.abc import Iterable
 from enum import IntEnum, StrEnum
 from functools import lru_cache
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Protocol, runtime_checkable
 
-from niri_pypc.types.generated.models import Window, Workspace
+from niri_pypc.types.generated.models import Window
 from niri_state import Snapshot
 from pydantic import BaseModel, Field
 
 from nirip.spec import _FROZEN, AppSpec, MatchRule, SessionSpec
+
+
+@runtime_checkable
+class WorkspaceLike(Protocol):
+    """Minimal workspace interface used by drift detection."""
+
+    @property
+    def id(self) -> int: ...
+
+    @property
+    def name(self) -> str | None: ...
+
+    @property
+    def output(self) -> str | None: ...
 
 
 class MatchTier(IntEnum):
@@ -208,7 +222,9 @@ def _assign(apps: list[tuple[str, AppSpec]], windows: Iterable[Window]) -> list[
 
 def resolve(spec: SessionSpec, snapshot: Snapshot) -> Resolution:
     """Resolve a session spec against a live snapshot."""
-    ws_by_name = {ws.name: ws for ws in snapshot.workspaces.values() if ws.name is not None}
+    ws_by_name: dict[str, WorkspaceLike] = {
+        ws.name: ws for ws in snapshot.workspaces.values() if ws.name is not None
+    }
     default_timeout = spec.options.default_startup_timeout_s
 
     all_apps: list[tuple[str, AppSpec]] = []
@@ -281,7 +297,7 @@ def _detect_drift(
     window: Window,
     app_spec: AppSpec,
     ws_name: str,
-    ws_by_name: dict[str, Workspace],
+    ws_by_name: dict[str, WorkspaceLike],
 ) -> list[DriftItem]:
     drift: list[DriftItem] = []
 
