@@ -7,14 +7,22 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, ConfigDict, Field, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    model_validator,
+)
+from pydantic import (
+    ValidationError as PydanticValidationError,
+)
 
 
 class NiripError(Exception):
     """Base for all nirip errors."""
 
 
-class ValidationError(NiripError):
+class SpecValidationError(NiripError):
     """Spec validation failed."""
 
     def __init__(self, errors: list[str], warnings: list[str] | None = None) -> None:
@@ -284,12 +292,12 @@ def load_from_string(text: str, *, source: str = "<string>") -> tuple[SessionSpe
 def load_from_dict(data: dict[str, Any], *, source: str = "<dict>") -> tuple[SessionSpec, ValidationResult]:
     try:
         spec = SessionSpec.model_validate(data)
-    except Exception as e:  # pydantic validation shape is user-facing text
+    except PydanticValidationError as e:
         raise NiripError(f"spec parse error in {source}: {e}") from e
 
     validation = validate_session(spec)
 
     if not validation.valid:
-        raise ValidationError(validation.errors, validation.warnings)
+        raise SpecValidationError(validation.errors, validation.warnings)
 
     return spec, validation

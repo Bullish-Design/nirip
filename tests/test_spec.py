@@ -6,7 +6,7 @@ from nirip.spec import (
     MatchRule,
     NiripError,
     SessionSpec,
-    ValidationError,
+    SpecValidationError,
     load_from_dict,
     load_from_string,
     validate_session,
@@ -46,7 +46,7 @@ def test_load_from_string_rejects_bad_yaml_shape() -> None:
 
 
 def test_load_from_dict_raises_validation_error() -> None:
-    with pytest.raises(ValidationError) as exc:
+    with pytest.raises(SpecValidationError) as exc:
         load_from_dict(
             {
                 "name": "s",
@@ -54,6 +54,25 @@ def test_load_from_dict_raises_validation_error() -> None:
             }
         )
     assert exc.value.errors
+
+
+def test_validate_detects_dependency_cycle() -> None:
+    spec = SessionSpec.model_validate(
+        {
+            "name": "s",
+            "workspaces": [
+                {
+                    "name": "ws",
+                    "apps": [
+                        {"name": "a", "match": {"app_id": "a"}, "depends_on": ["b"]},
+                        {"name": "b", "match": {"app_id": "b"}, "depends_on": ["a"]},
+                    ],
+                }
+            ],
+        }
+    )
+    result = validate_session(spec)
+    assert any("dependency cycle" in e for e in result.errors)
 
 
 def test_load_from_dict_success_tuple() -> None:

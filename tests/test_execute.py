@@ -1,14 +1,27 @@
 from __future__ import annotations
 
+import asyncio
+
+import pytest
 from tests.conftest import FakeSnapshot, FakeWindow, FakeWorkspace
 
-from nirip.execute import ApplyResult, StepOutcome, StepResult, _is_satisfied, _resolve_wid
-from nirip.plan import PlanStep, StepKind, WindowProperty
+from nirip.execute import (
+    ApplyResult,
+    SessionRuntime,
+    StepOutcome,
+    StepResult,
+    _is_satisfied,
+    _resolve_wid,
+    execute_plan,
+)
+from nirip.plan import Plan, PlanStep, StepKind, WindowProperty
+from nirip.resolve import Resolution
+from nirip.spec import SessionOptions
 
 
 def test_resolve_wid_prefers_step_window() -> None:
-    step = PlanStep(id="s", kind=StepKind.FOCUS_WINDOW, description="x", window_id=5, app_name="a")
-    assert _resolve_wid(step, {"a": type("A", (), {"matched_window_id": 9})()}) == 5
+    step = PlanStep(id="s", kind=StepKind.FOCUS_WINDOW, description="x", window_id=5, app_name="a", workspace_name="w")
+    assert _resolve_wid(step, {"w/a": type("A", (), {"matched_window_id": 9})()}) == 5
 
 
 def test_is_satisfied_for_move_and_state() -> None:
@@ -44,3 +57,22 @@ def test_apply_result_counters() -> None:
     assert result.completed_count == 1
     assert result.skipped_count == 1
     assert len(result.failed_steps) == 1
+
+
+def test_execute_plan_stops_on_error(monkeypatch) -> None:
+    steps = [
+        PlanStep(id="a", kind=StepKind.FOCUS_WORKSPACE, description="a"),
+        PlanStep(id="b", kind=StepKind.FOCUS_WORKSPACE, description="b"),
+    ]
+    plan = Plan(session_name="s", steps=steps, resolution=Resolution(session_name="s", workspaces=[], apps=[]))
+
+    async def fake_execute(step, _ports, _apps):
+        if step.id == "a":
+            return StepResult(step=step, outcome=StepOutcome.FAILED, message="nope")
+        return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="ok")
+
+    monkeypatch.setattr("nirip.execute._execute_step", fake_execute)
+    ports = SessionRuntime(state=type("S", (), {"snapshot": FakeSnapshot()})(), client=object())  # type: ignore[arg-type]
+    result = asyncio.run(execute_plan(plan, ports, SessionOptions(stop_on_error=True)))
+    assert len(result.steps) == 1
+    assert result.steps[0].outcome == StepOutcome.FAILED

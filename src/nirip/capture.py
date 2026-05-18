@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import re
+from typing import Any
+
 from niri_state import Snapshot
 from niri_state.api.selectors import windows, workspaces
 
@@ -21,17 +24,23 @@ def capture(snapshot: Snapshot, *, name: str | None = None) -> SessionSpec:
     return SessionSpec(name=name or "captured", workspaces=workspace_specs)
 
 
-def _infer_name(window) -> str:
+def _infer_name(window: Any) -> str:
     if window.app_id:
-        return window.app_id.rsplit(".", 1)[-1].lower().replace(" ", "-")
+        return _sanitize_name(window.app_id.rsplit(".", 1)[-1].lower())
     if window.title:
-        return window.title.lower().replace(" ", "-")[:30]
+        return _sanitize_name(window.title.lower())[:30]
     return f"app-{window.id}"
 
 
-def _infer_match(window) -> MatchRule:
+def _infer_match(window: Any) -> MatchRule:
     if window.app_id:
         return MatchRule(app_id=window.app_id)
     if window.title:
         return MatchRule(title=window.title)
     return MatchRule(title=f"window-{window.id}")
+
+
+def _sanitize_name(name: str) -> str:
+    cleaned = re.sub(r"[^a-z0-9._-]+", "-", name)
+    cleaned = re.sub(r"-{2,}", "-", cleaned).strip("-")
+    return cleaned or "app"

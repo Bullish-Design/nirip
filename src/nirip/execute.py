@@ -14,14 +14,13 @@ from niri_pypc import NiriClient, actions
 from niri_state import NiriState, Snapshot, WaitTimeoutError
 from niri_state.api.config import NiriStateConfig
 from niri_state.api.waiters import wait_until
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel
 
 from nirip.plan import Plan, PlanStep, ResizeAxis, StepKind, WindowProperty
 from nirip.resolve import evaluate_rule
-from nirip.spec import SessionOptions
+from nirip.spec import _FROZEN, SessionOptions
 
-_FROZEN = ConfigDict(extra="forbid", frozen=True)
-_WAIT_CONFIG = NiriStateConfig()
+_WAIT_CONFIG = NiriStateConfig()  # frozen default wait behavior for state confirmations
 
 
 class StepOutcome(StrEnum):
@@ -64,7 +63,7 @@ class ApplyResult(BaseModel):
 
 
 @dataclass
-class SessionPorts:
+class SessionRuntime:
     state: NiriState
     client: NiriClient
 
@@ -122,8 +121,10 @@ async def _wait(state: NiriState, predicate: Callable[[Snapshot], bool], timeout
 def _resolve_wid(step: PlanStep, apps: dict[str, _AppState]) -> int | None:
     if step.window_id is not None:
         return step.window_id
-    if step.app_name and step.app_name in apps:
-        return apps[step.app_name].matched_window_id
+    if step.app_name and step.workspace_name:
+        app_key = f"{step.workspace_name}/{step.app_name}"
+        if app_key in apps:
+            return apps[app_key].matched_window_id
     return None
 
 
@@ -150,7 +151,7 @@ def _is_satisfied(step: PlanStep, snapshot: Snapshot) -> bool:
             return False
 
 
-async def _execute_step(step: PlanStep, ports: SessionPorts, apps: dict[str, _AppState]) -> StepResult:
+async def _execute_step(step: PlanStep, ports: SessionRuntime, apps: dict[str, _AppState]) -> StepResult:
     if _is_satisfied(step, ports.state.snapshot):
         return StepResult(step=step, outcome=StepOutcome.SKIPPED, message="already satisfied")
 
@@ -176,11 +177,13 @@ async def _execute_step(step: PlanStep, ports: SessionPorts, apps: dict[str, _Ap
             env = os.environ.copy()
             env.update(step.env)
             if isinstance(step.command, str):
-                proc = await asyncio.create_subprocess_exec("/bin/sh", "-lc", step.command, cwd=step.cwd, env=env)
+                proc = await asyncio.create_subprocess_exec("/bin/sh", "-c", step.command, cwd=step.cwd, env=env)
             else:
                 proc = await asyncio.create_subprocess_exec(*(step.command or []), cwd=step.cwd, env=env)
-            if step.app_name and step.app_name in apps:
-                apps[step.app_name].spawn_process = proc
+            if step.app_name and step.workspace_name:
+                app_key = f"{step.workspace_name}/{step.app_name}"
+                if app_key in apps:
+                    apps[app_key].spawn_process = proc
             return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="spawned", spawn_pid=proc.pid)
 
         case StepKind.WAIT_FOR_WINDOW:
@@ -198,13 +201,18 @@ async def _execute_step(step: PlanStep, ports: SessionPorts, apps: dict[str, _Ap
                         return True
                 return False
 
-            proc = apps.get(step.app_name or "", _AppState()).spawn_process
+            app_key = f"{step.workspace_name}/{step.app_name}" if step.app_name and step.workspace_name else ""
+            proc = apps.get(app_key, _AppState()).spawn_process
             if proc is not None:
                 wait_task = asyncio.create_task(_wait(ports.state, predicate, step.timeout_s or 0.0))
                 exit_task = asyncio.create_task(proc.wait())
                 done, pending = await asyncio.wait({wait_task, exit_task}, return_when=asyncio.FIRST_COMPLETED)
                 for task in pending:
                     task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass
                 if exit_task in done and wait_task not in done:
                     rc = exit_task.result()
                     return StepResult(
@@ -217,8 +225,8 @@ async def _execute_step(step: PlanStep, ports: SessionPorts, apps: dict[str, _Ap
             else:
                 await _wait(ports.state, predicate, step.timeout_s or 0.0)
 
-            if step.app_name and step.app_name in apps:
-                apps[step.app_name].matched_window_id = matched_wid
+            if app_key and app_key in apps:
+                apps[app_key].matched_window_id = matched_wid
             return StepResult(
                 step=step,
                 outcome=StepOutcome.COMPLETED,
@@ -259,7 +267,12 @@ async def _execute_step(step: PlanStep, ports: SessionPorts, apps: dict[str, _Ap
                     timeout=1.5,
                 )
             except WaitTimeoutError:
-                pass
+                return StepResult(
+                    step=step,
+                    outcome=StepOutcome.COMPLETED,
+                    message=f"{step.property} set (unconfirmed)",
+                    window_id=wid,
+                )
             return StepResult(step=step, outcome=StepOutcome.COMPLETED, message=f"{step.property} set", window_id=wid)
 
         case StepKind.RESIZE:
@@ -295,7 +308,7 @@ async def _execute_step(step: PlanStep, ports: SessionPorts, apps: dict[str, _Ap
 
 async def execute_plan(
     plan: Plan,
-    ports: SessionPorts,
+    ports: SessionRuntime,
     options: SessionOptions,
     hook: ExecutionHook | None = None,
 ) -> ApplyResult:
@@ -304,8 +317,10 @@ async def execute_plan(
 
     apps: dict[str, _AppState] = {}
     for step in plan.steps:
-        if step.app_name and step.app_name not in apps:
-            apps[step.app_name] = _AppState()
+        if step.app_name and step.workspace_name:
+            key = f"{step.workspace_name}/{step.app_name}"
+            if key not in apps:
+                apps[key] = _AppState()
 
     results: list[StepResult] = []
     for step in plan.steps:

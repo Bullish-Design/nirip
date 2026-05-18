@@ -5,12 +5,10 @@ from __future__ import annotations
 from collections import defaultdict, deque
 from enum import StrEnum
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field, model_validator
 
 from nirip.resolve import AppResolution, DriftKind, Resolution, ResolutionStatus, WorkspaceState
-from nirip.spec import MatchRule, NiripError, SessionOptions
-
-_FROZEN = ConfigDict(extra="forbid", frozen=True)
+from nirip.spec import _FROZEN, MatchRule, NiripError, SessionOptions
 
 
 class StepKind(StrEnum):
@@ -67,6 +65,20 @@ class PlanStep(BaseModel):
     axis: ResizeAxis | None = None
     proportion: float | None = None
     pixels: int | None = None
+
+    @model_validator(mode="after")
+    def _validate_for_kind(self) -> PlanStep:
+        if self.kind == StepKind.SPAWN_WINDOW and self.command is None:
+            raise ValueError("SPAWN_WINDOW requires command")
+        if self.kind == StepKind.WAIT_FOR_WINDOW and (self.match is None or self.timeout_s is None):
+            raise ValueError("WAIT_FOR_WINDOW requires match and timeout_s")
+        if self.kind == StepKind.MOVE_WORKSPACE_TO_OUTPUT and self.target_output is None:
+            raise ValueError("MOVE_WORKSPACE_TO_OUTPUT requires target_output")
+        if self.kind == StepKind.SET_STATE and self.property is None:
+            raise ValueError("SET_STATE requires property")
+        if self.kind == StepKind.RESIZE and self.axis is None:
+            raise ValueError("RESIZE requires axis")
+        return self
 
 
 class Plan(BaseModel):
@@ -228,7 +240,7 @@ def _wire_dependencies(
     app_first: dict[str, str],
     app_last: dict[str, str],
     resolution: Resolution,
-) -> None:
+) -> list[PlanStep]:
     deps_to_add: dict[str, list[str]] = {}
 
     for ws in resolution.workspaces:
@@ -245,11 +257,12 @@ def _wire_dependencies(
                 if dep_last:
                     deps_to_add.setdefault(first_id, []).append(dep_last)
 
-    if deps_to_add:
-        steps[:] = [
-            s.model_copy(update={"depends_on": s.depends_on + deps_to_add[s.id]}) if s.id in deps_to_add else s
-            for s in steps
-        ]
+    if not deps_to_add:
+        return steps
+    return [
+        s.model_copy(update={"depends_on": s.depends_on + deps_to_add[s.id]}) if s.id in deps_to_add else s
+        for s in steps
+    ]
 
 
 def _parse_size(value: float | str) -> tuple[float | None, int | None]:
@@ -331,7 +344,7 @@ def build_plan(resolution: Resolution, options: SessionOptions) -> Plan:
         if ws.focus:
             emit(StepKind.FOCUS_WORKSPACE, f"focus workspace '{ws.name}'", workspace_name=ws.name)
 
-    _wire_dependencies(steps, app_first, app_last, resolution)
+    steps = _wire_dependencies(steps, app_first, app_last, resolution)
 
     return Plan(
         session_name=resolution.session_name,

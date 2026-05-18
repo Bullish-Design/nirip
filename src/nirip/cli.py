@@ -5,14 +5,26 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 import yaml
 
-from nirip.execute import ApplyResult, SessionPorts, execute_plan
+from nirip.execute import ApplyResult, SessionRuntime, execute_plan
 from nirip.plan import Plan, build_plan
-from nirip.resolve import Resolution, ResolutionStatus, resolve
+from nirip.resolve import DriftKind, Resolution, ResolutionStatus, resolve
 from nirip.spec import load_from_file
+
+
+@asynccontextmanager
+async def _open_state():
+    from niri_state import NiriState
+
+    state = await NiriState.open()
+    try:
+        yield state
+    finally:
+        await state.close()
 
 
 def format_resolution(resolution: Resolution) -> str:
@@ -46,7 +58,7 @@ def format_resolution(resolution: Resolution) -> str:
         if ar.status == ResolutionStatus.DRIFTED:
             if ar.needs_move:
                 will_move.append(label)
-            if any(d.kind.value != "wrong_workspace" for d in ar.drift):
+            if any(d.kind != DriftKind.WRONG_WORKSPACE for d in ar.drift):
                 drifted.append(label)
         elif ar.status == ResolutionStatus.AMBIGUOUS:
             errors.append(f"ambiguous match: {label}")
@@ -108,7 +120,7 @@ class LoggingHook:
         print(f"  -> {step.description}...", file=sys.stderr, flush=True)
 
     def on_step_complete(self, step, result) -> None:
-        del step
+        _ = step
         print(f"     {result.outcome} ({result.duration_s:.1f}s)", file=sys.stderr, flush=True)
 
     def on_plan_complete(self, result) -> None:
@@ -122,74 +134,56 @@ async def cmd_apply(session_file: str, *, yes: bool = False, dry_run: bool = Fal
         print(f"  warning: {w}", file=sys.stderr)
 
     from niri_pypc import NiriClient
-    from niri_state import NiriState
-
-    state = await NiriState.open()
     client = NiriClient.create()
-    ports = SessionPorts(state=state, client=client)
-    try:
-        resolution = resolve(spec, state.snapshot)
-        if dry_run:
+    async with _open_state() as state:
+        ports = SessionRuntime(state=state, client=client)
+        try:
+            resolution = resolve(spec, state.snapshot)
+            if dry_run:
+                plan = build_plan(resolution, spec.options)
+                return format_plan(plan)
+
+            if not yes and resolution.has_drift:
+                print(format_resolution(resolution), file=sys.stderr)
+                answer = await asyncio.to_thread(input, "Apply? [y/N] ")
+                if answer.lower() != "y":
+                    return "Aborted."
+
             plan = build_plan(resolution, spec.options)
-            return format_plan(plan)
+            if plan.is_empty:
+                return "Nothing to do."
 
-        if not yes and resolution.has_drift:
-            print(format_resolution(resolution), file=sys.stderr)
-            answer = await asyncio.to_thread(input, "Apply? [y/N] ")
-            if answer.lower() != "y":
-                return "Aborted."
-
-        plan = build_plan(resolution, spec.options)
-        if plan.is_empty:
-            return "Nothing to do."
-
-        hook = None if quiet else LoggingHook()
-        result = await execute_plan(plan, ports, spec.options, hook=hook)
-        return format_result(result)
-    finally:
-        await state.close()
-        await client.close()
+            hook = None if quiet else LoggingHook()
+            result = await execute_plan(plan, ports, spec.options, hook=hook)
+            return format_result(result)
+        finally:
+            await client.close()
 
 
 async def cmd_diff(session_file: str) -> str:
     spec, _ = load_from_file(session_file)
-    from niri_state import NiriState
-
-    state = await NiriState.open()
-    try:
+    async with _open_state() as state:
         resolution = resolve(spec, state.snapshot)
         return format_resolution(resolution)
-    finally:
-        await state.close()
 
 
 async def cmd_plan(session_file: str) -> str:
     spec, _ = load_from_file(session_file)
-    from niri_state import NiriState
-
-    state = await NiriState.open()
-    try:
+    async with _open_state() as state:
         resolution = resolve(spec, state.snapshot)
         plan = build_plan(resolution, spec.options)
         return format_plan(plan)
-    finally:
-        await state.close()
 
 
 async def cmd_capture(*, name: str | None = None, output: str | None = None) -> str:
-    from niri_state import NiriState
-
     from nirip.capture import capture
 
-    state = await NiriState.open()
-    try:
+    async with _open_state() as state:
         spec = capture(state.snapshot, name=name)
-        text = yaml.dump(spec.model_dump(), default_flow_style=False)
+        text = yaml.dump(spec.model_dump(mode="json"), default_flow_style=False, sort_keys=False)
         if output:
             Path(output).write_text(text, encoding="utf-8")
         return text
-    finally:
-        await state.close()
 
 
 def build_parser() -> argparse.ArgumentParser:

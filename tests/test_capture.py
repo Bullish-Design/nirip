@@ -4,7 +4,7 @@ from unittest.mock import Mock
 
 from tests.conftest import FakeSnapshot, FakeWindow, FakeWorkspace
 
-from nirip.capture import capture
+from nirip.capture import _infer_name, capture
 
 
 def test_capture_builds_session_spec(monkeypatch) -> None:
@@ -20,3 +20,8 @@ def test_capture_builds_session_spec(monkeypatch) -> None:
     assert spec.name == "captured"
     assert spec.workspaces[0].name == "web"
     assert spec.workspaces[0].apps[0].match.app_id == "org.mozilla.firefox"
+
+
+def test_infer_name_sanitizes_title() -> None:
+    name = _infer_name(FakeWindow(id=1, title="Hello/World: test\nname"))
+    assert name == "hello-world-test-name"

@@ -3,16 +3,18 @@
 from __future__ import annotations
 
 import asyncio
+from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
-from nirip.execute import ApplyResult, SessionPorts, execute_plan
+from nirip.execute import ApplyResult, SessionRuntime, execute_plan
 from nirip.plan import Plan, build_plan
 from nirip.resolve import Resolution, resolve
-from nirip.spec import NiripError, SessionSpec, ValidationError, load_from_file
+from nirip.spec import NiripError, SessionSpec, SpecValidationError, load_from_file
 
 __all__ = [
+    "__version__",
     "NiripError",
-    "ValidationError",
+    "SpecValidationError",
     "SessionSpec",
     "Resolution",
     "Plan",
@@ -23,6 +25,11 @@ __all__ = [
     "execute_plan",
     "apply_session",
 ]
+
+try:
+    __version__ = version("nirip")
+except PackageNotFoundError:  # pragma: no cover - editable/local execution fallback
+    __version__ = "0+unknown"
 
 
 def apply_session(path: str | Path) -> ApplyResult:
@@ -40,10 +47,14 @@ def apply_session(path: str | Path) -> ApplyResult:
             plan = build_plan(resolution, spec.options)
             if plan.is_empty:
                 return ApplyResult(session_name=spec.name, success=True, steps=[], total_duration_s=0.0)
-            ports = SessionPorts(state=state, client=client)
+            ports = SessionRuntime(state=state, client=client)
             return await execute_plan(plan, ports, spec.options)
         finally:
             await state.close()
             await client.close()
 
-    return asyncio.run(_run())
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(_run())
+    raise RuntimeError("apply_session() cannot be called from async context; use load/resolve/plan/execute directly")

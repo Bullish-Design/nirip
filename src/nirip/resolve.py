@@ -6,15 +6,13 @@ import re
 from collections.abc import Iterable
 from enum import IntEnum, StrEnum
 from functools import lru_cache
-from typing import Any
+from typing import Any, NamedTuple
 
 from niri_pypc.types.generated.models import Window, Workspace
 from niri_state import Snapshot
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, Field
 
-from nirip.spec import AppSpec, MatchRule, SessionSpec
-
-_FROZEN = ConfigDict(extra="forbid", frozen=True)
+from nirip.spec import _FROZEN, AppSpec, MatchRule, SessionSpec
 
 
 class MatchTier(IntEnum):
@@ -105,6 +103,11 @@ def _compile(pattern: str) -> re.Pattern[str]:
     return re.compile(pattern)
 
 
+class _Assignment(NamedTuple):
+    window_id: int | None
+    is_ambiguous: bool
+
+
 def evaluate_rule(rule: MatchRule, window: Window) -> tuple[bool, MatchTier]:
     """Evaluate a match rule against a window."""
     best_tier = MatchTier.NONE
@@ -156,12 +159,14 @@ def evaluate_rule(rule: MatchRule, window: Window) -> tuple[bool, MatchTier]:
     if failed:
         return False, MatchTier.NONE
     if best_tier == MatchTier.NONE:
+        # Composite-only rules (for example, only `not`) can match without
+        # raising a positive tier. Treat as weak rather than "no match quality".
         best_tier = MatchTier.WEAK
     return True, best_tier
 
 
-def _assign(apps: list[tuple[str, AppSpec]], windows: Iterable[Window]) -> list[tuple[int | None, bool]]:
-    """Return (assigned_window_id, is_ambiguous) per app index."""
+def _assign(apps: list[tuple[str, AppSpec]], windows: Iterable[Window]) -> list[_Assignment]:
+    """Return assignment data per app index."""
     window_list = list(windows)
     all_candidates: list[list[tuple[int, MatchTier]]] = []
     for _ws_name, app_spec in apps:
@@ -189,7 +194,7 @@ def _assign(apps: list[tuple[str, AppSpec]], windows: Iterable[Window]) -> list[
         assigned_app.add(app_idx)
         assigned_window.add(window_id)
 
-    out: list[tuple[int | None, bool]] = []
+    out: list[_Assignment] = []
     for idx, candidates in enumerate(all_candidates):
         wid = assigned.get(idx)
         is_ambiguous = False
@@ -197,7 +202,7 @@ def _assign(apps: list[tuple[str, AppSpec]], windows: Iterable[Window]) -> list[
             tiers = [tier for _wid, tier in candidates]
             top = max(tiers)
             is_ambiguous = sum(1 for tier in tiers if tier == top) > 1
-        out.append((wid, is_ambiguous))
+        out.append(_Assignment(window_id=wid, is_ambiguous=is_ambiguous))
     return out
 
 
@@ -231,7 +236,8 @@ def resolve(spec: SessionSpec, snapshot: Snapshot) -> Resolution:
 
     apps: list[AppResolution] = []
     for idx, (ws_name, app_spec) in enumerate(all_apps):
-        window_id, is_ambiguous = assignments[idx]
+        assignment = assignments[idx]
+        window_id, is_ambiguous = assignment.window_id, assignment.is_ambiguous
         timeout = app_spec.startup_timeout_s or default_timeout
 
         if window_id is not None:
