@@ -1,7 +1,7 @@
 # Nuclear Refactor Progress
 
 - [x] Step 1: Implemented `src/nirip/spec.py` (models, validation, loading, errors).
-- [ ] Step 2: Implement `src/nirip/resolve.py`.
+- [x] Step 2: Implemented `src/nirip/resolve.py` (matching, assignment, flat resolution).
 - [ ] Step 3: Implement `src/nirip/plan.py`.
 - [ ] Step 4: Implement `src/nirip/execute.py`.
 - [ ] Step 5: Implement `src/nirip/capture.py`.
