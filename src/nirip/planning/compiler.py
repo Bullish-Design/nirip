@@ -180,7 +180,7 @@ def compile_plan(resolution: Resolution, options: SessionOptions) -> Plan:
                 )
 
             if ar.spec.placement.column_width is not None:
-                prop, px = _parse_size(ar.spec.placement.column_width)
+                prop, px = parse_size(ar.spec.placement.column_width)
                 steps.append(
                     ResizeWindowStep(
                         id=next_id("resize"),
@@ -196,7 +196,7 @@ def compile_plan(resolution: Resolution, options: SessionOptions) -> Plan:
                 )
 
             if ar.spec.placement.window_height is not None:
-                prop, px = _parse_size(ar.spec.placement.window_height)
+                prop, px = parse_size(ar.spec.placement.window_height)
                 steps.append(
                     ResizeWindowStep(
                         id=next_id("resize"),
@@ -268,7 +268,7 @@ def compile_plan(resolution: Resolution, options: SessionOptions) -> Plan:
     return Plan(session_name=resolution.session_name, steps=steps, resolution=resolution)
 
 
-def _parse_size(value: float | str) -> tuple[float | None, int | None]:
+def parse_size(value: float | str) -> tuple[float | None, int | None]:
     """Parse size value: float proportion or "px:<integer>" fixed pixels."""
     if isinstance(value, (int, float)):
         return (float(value), None)
