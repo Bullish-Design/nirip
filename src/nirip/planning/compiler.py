@@ -3,23 +3,11 @@
 from __future__ import annotations
 
 from nirip.errors import PlanningError
+from nirip.planning.builder import PlanBuilder
 from nirip.planning.models import (
-    CreateWorkspaceStep,
-    FocusWindowStep,
-    FocusWorkspaceStep,
-    MoveWindowToWorkspaceStep,
-    MoveWorkspaceToOutputStep,
     Plan,
-    PlanStep,
-    ResizeAxis,
-    ResizeWindowStep,
     SessionDiff,
-    SetWindowStateStep,
-    SpawnWindowStep,
-    WaitForWindowStep,
-    WindowProperty,
 )
-from nirip.planning.ordering import topological_sort
 from nirip.resolve.models import (
     AppResolution,
     DriftKind,
@@ -42,229 +30,35 @@ def _should_act(ar: AppResolution, options: SessionOptions) -> bool:
             return True
         case ResolutionStatus.AMBIGUOUS:
             return False
-        case _: raise ValueError(f"unhandled status: {ar.status}")
+        case _:
+            raise ValueError(f"unhandled status: {ar.status}")
 
 
 def compile_plan(resolution: Resolution, options: SessionOptions) -> Plan:
     """Compile resolution into ordered execution plan."""
-    steps: list[PlanStep] = []
-    step_counter = 0
-
-    def next_id(prefix: str) -> str:
-        nonlocal step_counter
-        step_counter += 1
-        return f"{prefix}-{step_counter}"
+    builder = PlanBuilder(parse_size=parse_size)
 
     for wr in resolution.workspace_resolutions:
-        ensure_id: str | None = None
-
-        if not wr.exists:
-            ensure_id = next_id("create-ws")
-            steps.append(
-                CreateWorkspaceStep(
-                    id=ensure_id,
-                    description=f"create workspace '{wr.name}'",
-                    workspace_name=wr.name,
-                    target_output=wr.desired_output,
-                )
-            )
-        elif not wr.output_correct and wr.desired_output:
-            steps.append(
-                MoveWorkspaceToOutputStep(
-                    id=next_id("move-ws"),
-                    description=f"move workspace '{wr.name}' to {wr.desired_output}",
-                    workspace_name=wr.name,
-                    target_output=wr.desired_output,
-                )
-            )
+        ensure_id = builder.ensure_workspace(wr)
+        base_deps = [ensure_id] if ensure_id else []
 
         for ar in wr.app_resolutions:
             if not _should_act(ar, options):
                 continue
 
-            base_deps = [ensure_id] if ensure_id else []
             placement_deps = list(base_deps)
-            wid = ar.match_decision.assigned_window_id
 
             if ar.status == ResolutionStatus.MISSING and ar.spec.spawn:
-                spawn_id = next_id("spawn")
-                wait_id = next_id("wait")
-                steps.append(
-                    SpawnWindowStep(
-                        id=spawn_id,
-                        description=f"spawn {ar.app_name}",
-                        app_name=ar.app_name,
-                        workspace_name=wr.name,
-                        command=ar.spec.spawn.command,
-                        cwd=ar.spec.spawn.cwd,
-                        env=ar.spec.spawn.env,
-                        shell=ar.spec.spawn.shell,
-                        depends_on=base_deps,
-                    )
-                )
-                steps.append(
-                    WaitForWindowStep(
-                        id=wait_id,
-                        description=f"wait for {ar.app_name}",
-                        app_name=ar.app_name,
-                        workspace_name=wr.name,
-                        match=ar.spec.match,
-                        timeout_s=ar.startup_timeout_s,
-                        depends_on=[spawn_id],
-                    )
-                )
-                placement_deps = [wait_id]
+                placement_deps = builder.spawn_app(ar, wr.name, base_deps)
 
-            if ar.needs_move or ar.status == ResolutionStatus.MISSING:
-                steps.append(
-                    MoveWindowToWorkspaceStep(
-                        id=next_id("move"),
-                        description=f"move {ar.app_name} to '{wr.name}'",
-                        app_name=ar.app_name,
-                        workspace_name=wr.name,
-                        window_id=wid,
-                        depends_on=placement_deps,
-                    )
-                )
-
-            needs_float_or_tile_correction = any(d.kind == DriftKind.WRONG_FLOATING for d in ar.drift)
-            if not needs_float_or_tile_correction and ar.status == ResolutionStatus.MISSING:
-                needs_float_or_tile_correction = ar.spec.placement.floating
-            if needs_float_or_tile_correction:
-                prop = WindowProperty.FLOATING if ar.spec.placement.floating else WindowProperty.TILING
-                steps.append(
-                    SetWindowStateStep(
-                        id=next_id("state"),
-                        window_id=wid,
-                        property=prop,
-                        description=f"set {ar.app_name} {prop.value}",
-                        app_name=ar.app_name,
-                        workspace_name=wr.name,
-                        depends_on=placement_deps,
-                    )
-                )
-
-            needs_fullscreen = any(d.kind == DriftKind.WRONG_FULLSCREEN for d in ar.drift)
-            if not needs_fullscreen and ar.status == ResolutionStatus.MISSING:
-                needs_fullscreen = ar.spec.placement.fullscreen
-            if needs_fullscreen:
-                steps.append(
-                    SetWindowStateStep(
-                        id=next_id("state"),
-                        window_id=wid,
-                        property=WindowProperty.FULLSCREEN,
-                        value=ar.spec.placement.fullscreen,
-                        description=f"set {ar.app_name} fullscreen",
-                        app_name=ar.app_name,
-                        workspace_name=wr.name,
-                        depends_on=placement_deps,
-                    )
-                )
-
-            needs_maximized = any(d.kind == DriftKind.WRONG_MAXIMIZED for d in ar.drift)
-            if not needs_maximized and ar.status == ResolutionStatus.MISSING:
-                needs_maximized = ar.spec.placement.maximized
-            if needs_maximized:
-                steps.append(
-                    SetWindowStateStep(
-                        id=next_id("state"),
-                        window_id=wid,
-                        property=WindowProperty.MAXIMIZED,
-                        value=ar.spec.placement.maximized,
-                        description=f"set {ar.app_name} maximized",
-                        app_name=ar.app_name,
-                        workspace_name=wr.name,
-                        depends_on=placement_deps,
-                    )
-                )
-
-            if ar.spec.placement.column_width is not None:
-                prop, px = parse_size(ar.spec.placement.column_width)
-                steps.append(
-                    ResizeWindowStep(
-                        id=next_id("resize"),
-                        window_id=wid,
-                        axis=ResizeAxis.WIDTH,
-                        proportion=prop,
-                        pixels=px,
-                        description=f"set column width for {ar.app_name}",
-                        app_name=ar.app_name,
-                        workspace_name=wr.name,
-                        depends_on=placement_deps,
-                    )
-                )
-
-            if ar.spec.placement.window_height is not None:
-                prop, px = parse_size(ar.spec.placement.window_height)
-                steps.append(
-                    ResizeWindowStep(
-                        id=next_id("resize"),
-                        window_id=wid,
-                        axis=ResizeAxis.HEIGHT,
-                        proportion=prop,
-                        pixels=px,
-                        description=f"set window height for {ar.app_name}",
-                        app_name=ar.app_name,
-                        workspace_name=wr.name,
-                        depends_on=placement_deps,
-                    )
-                )
-
-            if ar.spec.placement.focus:
-                steps.append(
-                    FocusWindowStep(
-                        id=next_id("focus"),
-                        window_id=wid,
-                        description=f"focus {ar.app_name}",
-                        app_name=ar.app_name,
-                        workspace_name=wr.name,
-                        depends_on=placement_deps,
-                    )
-                )
+            builder.place_window(ar, wr, placement_deps)
 
     for wr in resolution.workspace_resolutions:
         if wr.focus:
-            steps.append(
-                FocusWorkspaceStep(
-                    id=next_id("focus-ws"),
-                    description=f"focus workspace '{wr.name}'",
-                    workspace_name=wr.name,
-                )
-            )
+            builder.focus_workspace(wr)
 
-    app_first_step: dict[str, str] = {}
-    app_last_step: dict[str, str] = {}
-    for s in steps:
-        if s.app_name and s.workspace_name:
-            key = f"{s.workspace_name}/{s.app_name}"
-            if key not in app_first_step:
-                app_first_step[key] = s.id
-            app_last_step[key] = s.id
-
-    deps_to_add: dict[str, list[str]] = {}
-    for wr in resolution.workspace_resolutions:
-        for ar in wr.app_resolutions:
-            if not ar.spec.depends_on:
-                continue
-            first_key = f"{wr.name}/{ar.app_name}"
-            first_id = app_first_step.get(first_key)
-            if first_id is None:
-                continue
-            for dep_name in ar.spec.depends_on:
-                dep_key = f"{wr.name}/{dep_name}"
-                dep_last = app_last_step.get(dep_key)
-                if dep_last:
-                    deps_to_add.setdefault(first_id, []).append(dep_last)
-
-    if deps_to_add:
-        steps = [
-            s.model_copy(update={"depends_on": s.depends_on + deps_to_add[s.id]}) if s.id in deps_to_add else s
-            for s in steps
-        ]
-
-    steps = topological_sort(steps)
-
-    return Plan(session_name=resolution.session_name, steps=steps, resolution=resolution)
+    builder.wire_app_dependencies(resolution)
+    return Plan(session_name=resolution.session_name, steps=builder.build(), resolution=resolution)
 
 
 def parse_size(value: float | str) -> tuple[float | None, int | None]:

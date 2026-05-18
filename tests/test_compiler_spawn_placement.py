@@ -1,11 +1,11 @@
 """Tests that spawned apps get full placement steps."""
 
 from nirip.planning.compiler import compile_plan
-from nirip.planning.models import WindowProperty
+from nirip.planning.models import SetWindowStateStep, WindowProperty
 from nirip.resolve.models import (
     AppResolution,
-    MatchTier,
     MatchDecision,
+    MatchTier,
     Resolution,
     ResolutionStatus,
     WorkspaceResolution,
@@ -80,7 +80,9 @@ def test_spawned_app_placement_has_null_window_id() -> None:
     plan = compile_plan(resolution, options)
 
     state_step = next(
-        s for s in plan.steps if s.kind == "set_window_state" and s.property == WindowProperty.FLOATING
+        s
+        for s in plan.steps
+        if isinstance(s, SetWindowStateStep) and s.property == WindowProperty.FLOATING
     )
     assert state_step.window_id is None
     assert state_step.app_name == "myapp"
@@ -92,7 +94,9 @@ def test_spawned_app_placement_depends_on_wait() -> None:
 
     wait_step = next(s for s in plan.steps if s.kind == "wait_for_window")
     state_step = next(
-        s for s in plan.steps if s.kind == "set_window_state" and s.property == WindowProperty.FLOATING
+        s
+        for s in plan.steps
+        if isinstance(s, SetWindowStateStep) and s.property == WindowProperty.FLOATING
     )
     assert wait_step.id in state_step.depends_on
 
@@ -115,6 +119,8 @@ def test_spawned_app_non_default_state_is_emitted() -> None:
     )
     plan = compile_plan(resolution, options)
     fullscreen_steps = [
-        step for step in plan.steps if step.kind == "set_window_state" and step.property == WindowProperty.FULLSCREEN
+        step
+        for step in plan.steps
+        if isinstance(step, SetWindowStateStep) and step.property == WindowProperty.FULLSCREEN
     ]
     assert len(fullscreen_steps) == 1

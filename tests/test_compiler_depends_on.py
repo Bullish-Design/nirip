@@ -3,8 +3,8 @@
 from nirip.planning.compiler import compile_plan
 from nirip.resolve.models import (
     AppResolution,
-    MatchTier,
     MatchDecision,
+    MatchTier,
     Resolution,
     ResolutionStatus,
     WorkspaceResolution,

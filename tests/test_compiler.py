@@ -1,6 +1,8 @@
 from types import SimpleNamespace
+from typing import cast
 
 import pytest
+from niri_state import Snapshot
 
 from nirip.errors import PlanningError
 from nirip.planning.compiler import compile_plan, parse_size
@@ -23,7 +25,7 @@ def test_compiler_propagates_spawn_and_wait_data() -> None:
             )
         ],
     )
-    snap = SimpleNamespace(windows={}, workspaces={})
+    snap = cast(Snapshot, SimpleNamespace(windows={}, workspaces={}))
     resolution = resolve(spec, snap)
     plan = compile_plan(resolution, spec.options)
     kinds = [s.kind for s in plan.steps]
