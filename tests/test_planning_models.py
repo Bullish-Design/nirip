@@ -1,4 +1,7 @@
+import pytest
+
 from nirip.planning.models import CreateWorkspaceStep, MoveWindowToWorkspaceStep
+from nirip.planning.models import ResizeAxis, ResizeWindowStep
 
 
 def test_plan_step_discriminator_roundtrip() -> None:
@@ -18,3 +21,12 @@ def test_typed_fields_present() -> None:
         target_workspace="w",
     )
     assert step.window_id == 1
+
+
+def test_resize_window_step_requires_exactly_one_size() -> None:
+    with pytest.raises(ValueError, match="exactly one"):
+        ResizeWindowStep(id="r1", description="resize", axis=ResizeAxis.WIDTH)
+    with pytest.raises(ValueError, match="exactly one"):
+        ResizeWindowStep(id="r2", description="resize", axis=ResizeAxis.WIDTH, proportion=0.5, pixels=100)
+    step = ResizeWindowStep(id="r3", description="resize", axis=ResizeAxis.WIDTH, proportion=0.5)
+    assert step.proportion == 0.5

@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import StrEnum
 from typing import Annotated, Literal
 
-from pydantic import Discriminator, Field, computed_field
+from pydantic import Discriminator, Field, computed_field, model_validator
 
 from nirip._base import NiripModel
 from nirip.resolve.models import Resolution
@@ -75,6 +75,14 @@ class ResizeWindowStep(StepBase):
     axis: ResizeAxis
     proportion: float | None = None
     pixels: int | None = None
+
+    @model_validator(mode="after")
+    def _exactly_one_size(self) -> ResizeWindowStep:
+        has_prop = self.proportion is not None
+        has_px = self.pixels is not None
+        if has_prop == has_px:
+            raise ValueError("exactly one of 'proportion' or 'pixels' must be set")
+        return self
 
 
 class FocusWindowStep(StepBase):
