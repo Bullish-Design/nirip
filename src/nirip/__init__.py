@@ -5,59 +5,45 @@ from __future__ import annotations
 import asyncio
 from pathlib import Path
 
-from nirip.config import NiripConfig
-from nirip.execution.models import ApplyResult
-from nirip.facade.async_nirip import AsyncNirip
-from nirip.planning.models import Plan, SessionDiff
-from nirip.spec.loader import load_spec_from_dict, load_spec_from_file, load_spec_from_string
-from nirip.spec.models import SessionSpec
-from nirip.spec.validators import ValidatedSpec
+from nirip.execute import ApplyResult, SessionPorts, execute_plan
+from nirip.plan import Plan, build_plan
+from nirip.resolve import Resolution, resolve
+from nirip.spec import NiripError, SessionSpec, ValidationError, load_from_file
 
 __all__ = [
-    "ApplyResult",
-    "AsyncNirip",
-    "NiripConfig",
-    "Plan",
+    "NiripError",
+    "ValidationError",
     "SessionSpec",
-    "SessionDiff",
-    "ValidatedSpec",
+    "Resolution",
+    "Plan",
+    "ApplyResult",
+    "load_from_file",
+    "resolve",
+    "build_plan",
+    "execute_plan",
     "apply_session",
-    "diff_session",
-    "load_session",
-    "load_spec_from_dict",
-    "load_spec_from_file",
-    "load_spec_from_string",
-    "plan_session",
 ]
 
 
-def load_session(path: str | Path) -> ValidatedSpec:
-    return load_spec_from_file(path)
+def apply_session(path: str | Path) -> ApplyResult:
+    """One-shot sync: load -> resolve -> plan -> execute."""
+    from niri_pypc import NiriClient
+    from niri_state import NiriState
 
+    spec, _ = load_from_file(path)
 
-def apply_session(spec: SessionSpec, config: NiripConfig | None = None) -> ApplyResult:
     async def _run() -> ApplyResult:
-        async with AsyncNirip.open(config) as nirip:
-            return await nirip.apply(spec)
-
-    return asyncio.run(_run())
-
-
-def plan_session(spec: SessionSpec, config: NiripConfig | None = None) -> Plan:
-    """One-shot sync plan."""
-
-    async def _run() -> Plan:
-        async with AsyncNirip.open(config) as nirip:
-            return await nirip.plan(spec)
-
-    return asyncio.run(_run())
-
-
-def diff_session(spec: SessionSpec, config: NiripConfig | None = None) -> SessionDiff:
-    """One-shot sync diff."""
-
-    async def _run() -> SessionDiff:
-        async with AsyncNirip.open(config) as nirip:
-            return await nirip.diff(spec)
+        state = await NiriState.open()
+        client = NiriClient.create()
+        try:
+            resolution = resolve(spec, state.snapshot)
+            plan = build_plan(resolution, spec.options)
+            if plan.is_empty:
+                return ApplyResult(session_name=spec.name, success=True, steps=[], total_duration_s=0.0)
+            ports = SessionPorts(state=state, client=client)
+            return await execute_plan(plan, ports, spec.options)
+        finally:
+            await state.close()
+            await client.close()
 
     return asyncio.run(_run())
