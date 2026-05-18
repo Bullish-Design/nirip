@@ -9,6 +9,7 @@ import sys
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="nirip", description="Niri session manager")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Show full traceback on error")
     sub = parser.add_subparsers(dest="command")
 
     p_apply = sub.add_parser("apply", help="Apply a session spec")
@@ -52,7 +53,12 @@ def main(argv: list[str] | None = None) -> int:
             parser.print_help()
             return 1
     except Exception as e:
-        print(f"error: {e}", file=sys.stderr)
+        if args.verbose:
+            import traceback
+
+            traceback.print_exc(file=sys.stderr)
+        else:
+            print(f"error: {e}", file=sys.stderr)
         return 1
 
     print(output)
