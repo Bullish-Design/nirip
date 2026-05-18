@@ -33,3 +33,14 @@ class FakeSnapshot:
     outputs: dict[str, Any] = field(default_factory=dict)
     focused_window_id: int | None = None
     focused_workspace_id: int | None = None
+
+
+def _assert_structural_compat() -> None:
+    """Verify test fakes expose expected snapshot attributes."""
+    snap = FakeSnapshot()
+    _ = snap.windows
+    _ = snap.workspaces
+    _ = snap.outputs
+
+
+_assert_structural_compat()
