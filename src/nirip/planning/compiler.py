@@ -128,9 +128,9 @@ def compile_plan(resolution: Resolution, options: SessionOptions) -> Plan:
                     )
                 )
 
-            needs_float_or_tile_correction = ar.status == ResolutionStatus.MISSING or any(
-                d.kind == DriftKind.WRONG_FLOATING for d in ar.drift
-            )
+            needs_float_or_tile_correction = any(d.kind == DriftKind.WRONG_FLOATING for d in ar.drift)
+            if not needs_float_or_tile_correction and ar.status == ResolutionStatus.MISSING:
+                needs_float_or_tile_correction = ar.spec.placement.floating
             if needs_float_or_tile_correction:
                 prop = WindowProperty.FLOATING if ar.spec.placement.floating else WindowProperty.TILING
                 steps.append(
@@ -145,7 +145,10 @@ def compile_plan(resolution: Resolution, options: SessionOptions) -> Plan:
                     )
                 )
 
-            if ar.status == ResolutionStatus.MISSING or any(d.kind == DriftKind.WRONG_FULLSCREEN for d in ar.drift):
+            needs_fullscreen = any(d.kind == DriftKind.WRONG_FULLSCREEN for d in ar.drift)
+            if not needs_fullscreen and ar.status == ResolutionStatus.MISSING:
+                needs_fullscreen = ar.spec.placement.fullscreen
+            if needs_fullscreen:
                 steps.append(
                     SetWindowStateStep(
                         id=next_id("state"),
@@ -159,7 +162,10 @@ def compile_plan(resolution: Resolution, options: SessionOptions) -> Plan:
                     )
                 )
 
-            if ar.status == ResolutionStatus.MISSING or any(d.kind == DriftKind.WRONG_MAXIMIZED for d in ar.drift):
+            needs_maximized = any(d.kind == DriftKind.WRONG_MAXIMIZED for d in ar.drift)
+            if not needs_maximized and ar.status == ResolutionStatus.MISSING:
+                needs_maximized = ar.spec.placement.maximized
+            if needs_maximized:
                 steps.append(
                     SetWindowStateStep(
                         id=next_id("state"),
