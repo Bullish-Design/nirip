@@ -1,1 +1,14 @@
 # Nuclear Refactor Progress
+
+- [x] Step 1: Implemented `src/nirip/spec.py` (models, validation, loading, errors).
+- [ ] Step 2: Implement `src/nirip/resolve.py`.
+- [ ] Step 3: Implement `src/nirip/plan.py`.
+- [ ] Step 4: Implement `src/nirip/execute.py`.
+- [ ] Step 5: Implement `src/nirip/capture.py`.
+- [ ] Step 6: Implement `src/nirip/cli.py`.
+- [ ] Step 7: Implement `src/nirip/__init__.py`.
+- [ ] Step 8: Verify `src/nirip/__main__.py` entry.
+- [ ] Step 9: Delete legacy code (already absent in this branch, verify final state).
+- [ ] Step 10: Build new v2 test suite from scratch.
+- [ ] Step 11: Optional version bump in `pyproject.toml`.
+- [ ] Step 12: Final validation suite.
