@@ -2,17 +2,20 @@
 
 from __future__ import annotations
 
+from asyncio.subprocess import Process as AsyncProcess
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class AppRuntimeState(BaseModel):
-    model_config = ConfigDict(extra="forbid", frozen=False)
+    model_config = ConfigDict(extra="forbid", frozen=False, arbitrary_types_allowed=True)
 
     app_name: str
     workspace_name: str
     matched_window_id: int | None = None
     spawned: bool = False
     spawn_pid: int | None = None
+    spawn_process: AsyncProcess | None = None
     completed: bool = False
     error: str | None = None
 

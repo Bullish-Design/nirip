@@ -66,3 +66,40 @@ def test_wait_step_captures_window_id(monkeypatch) -> None:
     result = asyncio.run(execute_step(step, SessionPorts(state=state, client=DummyClient()), runtime))
     assert result.window_id == 42
     assert runtime.apps["myapp"].matched_window_id == 42
+
+
+def test_wait_step_fails_fast_if_spawned_process_exits(monkeypatch) -> None:
+    state = DummyState()
+
+    async def fake_wait(_state, _predicate, _timeout):
+        await asyncio.sleep(0.1)
+        return state.snapshot
+
+    class FakeProcess:
+        async def wait(self) -> int:
+            return 3
+
+    monkeypatch.setattr("nirip.execution.handlers._wait", fake_wait)
+    step = WaitForWindowStep(
+        id="wait-2",
+        description="wait for app",
+        app_name="myapp",
+        workspace_name="w",
+        match=MatchRule(app_id="myapp"),
+        timeout_s=1.0,
+    )
+    runtime = SessionRuntime(
+        session_name="s",
+        apps={
+            "myapp": AppRuntimeState(
+                app_name="myapp",
+                workspace_name="w",
+                spawned=True,
+                spawn_pid=123,
+            )
+        },
+    )
+    runtime.apps["myapp"].spawn_process = FakeProcess()  # type: ignore[assignment]
+    result = asyncio.run(execute_step(step, SessionPorts(state=state, client=DummyClient()), runtime))
+    assert result.outcome.value == "failed"
+    assert result.message == "process exited with code 3 before window appeared"

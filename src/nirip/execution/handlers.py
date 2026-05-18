@@ -92,6 +92,7 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                 app_state = runtime.apps[step.app_name]
                 app_state.spawned = True
                 app_state.spawn_pid = proc.pid
+                app_state.spawn_process = proc
             return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="spawned", spawn_pid=proc.pid)
         case WaitForWindowStep():
             matched_wid: int | None = None
@@ -105,7 +106,28 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
                         return True
                 return False
 
-            await _wait(ports.state, predicate, step.timeout_s)
+            proc = None
+            if step.app_name and step.app_name in runtime.apps:
+                proc = runtime.apps[step.app_name].spawn_process
+
+            if proc is not None:
+                wait_task = asyncio.create_task(_wait(ports.state, predicate, step.timeout_s))
+                exit_task = asyncio.create_task(proc.wait())
+                done, pending = await asyncio.wait({wait_task, exit_task}, return_when=asyncio.FIRST_COMPLETED)
+                for task in pending:
+                    task.cancel()
+                if exit_task in done and wait_task not in done:
+                    rc = exit_task.result()
+                    return StepResult(
+                        step=step,
+                        outcome=StepOutcome.FAILED,
+                        message=f"process exited with code {rc} before window appeared",
+                    )
+                if wait_task in done:
+                    await wait_task
+            else:
+                await _wait(ports.state, predicate, step.timeout_s)
+
             if step.app_name and step.app_name in runtime.apps:
                 runtime.apps[step.app_name].matched_window_id = matched_wid
             return StepResult(
