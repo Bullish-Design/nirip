@@ -4,7 +4,7 @@
 - [x] Step 2: Implemented `src/nirip/resolve.py` (matching, assignment, flat resolution).
 - [x] Step 3: Implemented `src/nirip/plan.py` (unified steps, plan builder, topo sort).
 - [x] Step 4: Implemented `src/nirip/execute.py` (async engine, handlers, hooks, runtime state).
-- [ ] Step 5: Implement `src/nirip/capture.py`.
+- [x] Step 5: Implemented `src/nirip/capture.py` (snapshot to SessionSpec capture).
 - [ ] Step 6: Implement `src/nirip/cli.py`.
 - [ ] Step 7: Implement `src/nirip/__init__.py`.
 - [ ] Step 8: Verify `src/nirip/__main__.py` entry.
