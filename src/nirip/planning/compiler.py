@@ -123,7 +123,6 @@ def compile_plan(resolution: Resolution, options: SessionOptions) -> Plan:
                         app_name=ar.app_name,
                         workspace_name=wr.name,
                         window_id=wid,
-                        target_workspace=wr.name,
                         depends_on=placement_deps,
                     )
                 )

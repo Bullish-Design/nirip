@@ -23,7 +23,7 @@ def is_already_satisfied(step: PlanStep, snapshot: Snapshot) -> bool:
             w = snapshot.windows.get(step.window_id)
             if w is None:
                 return False
-            target = next((ws for ws in snapshot.workspaces.values() if ws.name == step.target_workspace), None)
+            target = next((ws for ws in snapshot.workspaces.values() if ws.name == step.workspace_name), None)
             return target is not None and w.workspace_id == target.id
         case SetWindowStateStep():
             if step.window_id is None:

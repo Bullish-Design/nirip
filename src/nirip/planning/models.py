@@ -47,7 +47,6 @@ class WaitForWindowStep(StepBase):
 class MoveWindowToWorkspaceStep(StepBase):
     kind: Literal["move_window_to_workspace"] = "move_window_to_workspace"
     window_id: int | None = None
-    target_workspace: str
 
 
 class WindowProperty(StrEnum):

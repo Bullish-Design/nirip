@@ -141,8 +141,8 @@ async def execute_step(step: PlanStep, ports: SessionPorts, runtime: SessionRunt
             if wid is None:
                 return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
             wid_int = wid
-            target_workspace = step.target_workspace
-            workspace_ref = actions.workspace_by_name(step.target_workspace)
+            target_workspace = step.workspace_name or ""
+            workspace_ref = actions.workspace_by_name(target_workspace)
             await _request(
                 ports.client,
                 actions.move_window_to_workspace(workspace_ref, window_id=wid_int),

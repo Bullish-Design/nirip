@@ -18,7 +18,6 @@ def test_typed_fields_present() -> None:
         app_name="a",
         workspace_name="w",
         window_id=1,
-        target_workspace="w",
     )
     assert step.window_id == 1
 
