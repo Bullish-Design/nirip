@@ -7,7 +7,7 @@
 - [x] Step 5: Implemented `src/nirip/capture.py` (snapshot to SessionSpec capture).
 - [x] Step 6: Implemented `src/nirip/cli.py` (commands, formatting, parser, main).
 - [x] Step 7: Implemented `src/nirip/__init__.py` (new public API, sync apply_session).
-- [ ] Step 8: Verify `src/nirip/__main__.py` entry.
+- [x] Step 8: Updated `src/nirip/__main__.py` to v2 cli entrypoint.
 - [ ] Step 9: Delete legacy code (already absent in this branch, verify final state).
 - [ ] Step 10: Build new v2 test suite from scratch.
 - [ ] Step 11: Optional version bump in `pyproject.toml`.

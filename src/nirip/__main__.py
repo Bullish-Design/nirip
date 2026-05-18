@@ -1,3 +1,3 @@
-from nirip.cli.main import main
+from nirip.cli import main
 
-main()
+raise SystemExit(main())
