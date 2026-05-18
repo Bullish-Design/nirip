@@ -76,17 +76,6 @@ class ExecutionHook(Protocol):
     def on_plan_complete(self, result: ApplyResult) -> None: ...
 
 
-class _NullHook:
-    def on_step_start(self, step: PlanStep) -> None:
-        pass
-
-    def on_step_complete(self, step: PlanStep, result: StepResult) -> None:
-        pass
-
-    def on_plan_complete(self, result: ApplyResult) -> None:
-        pass
-
-
 @dataclass
 class _AppState:
     matched_window_id: int | None = None
@@ -313,7 +302,6 @@ async def execute_plan(
     hook: ExecutionHook | None = None,
 ) -> ApplyResult:
     t0 = time.monotonic()
-    exec_hook = hook or _NullHook()
 
     apps: dict[str, _AppState] = {}
     for step in plan.steps:
@@ -324,7 +312,8 @@ async def execute_plan(
 
     results: list[StepResult] = []
     for step in plan.steps:
-        exec_hook.on_step_start(step)
+        if hook:
+            hook.on_step_start(step)
         t_step = time.monotonic()
         try:
             result = await _execute_step(step, ports, apps)
@@ -346,7 +335,8 @@ async def execute_plan(
         if result.duration_s == 0.0:
             result = result.model_copy(update={"duration_s": time.monotonic() - t_step})
 
-        exec_hook.on_step_complete(step, result)
+        if hook:
+            hook.on_step_complete(step, result)
         results.append(result)
         if result.outcome in (StepOutcome.FAILED, StepOutcome.TIMED_OUT) and options.stop_on_error:
             break
@@ -357,5 +347,6 @@ async def execute_plan(
         steps=results,
         total_duration_s=time.monotonic() - t0,
     )
-    exec_hook.on_plan_complete(apply_result)
+    if hook:
+        hook.on_plan_complete(apply_result)
     return apply_result
