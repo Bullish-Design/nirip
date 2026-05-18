@@ -112,18 +112,20 @@ Plus:
 
 ### Step 0: Preparation
 
-**Branch and backup:**
+**Branch and backup:**  (**COMPLETE**)
 ```bash
 git checkout -b nuclear-refactor
 # The old code stays on main — no risk
 ```
 
-**Verify current tests pass:**
+**Verify current tests pass:**  (**COMPLETE**)
 ```bash
 uv run pytest
 ```
 
 ### Step 1: Write `src/nirip/spec.py` (~300 LOC)
+
+A spec is a declarative description of what your desktop session should look like — which apps should be running, on which workspaces, in what arrangement.
 
 This is the foundation — everything else depends on it.
 
