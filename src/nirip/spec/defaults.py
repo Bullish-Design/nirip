@@ -6,7 +6,11 @@ from nirip.spec.models import SessionSpec
 
 
 def apply_defaults(spec: SessionSpec) -> SessionSpec:
-    """Return new SessionSpec with defaults applied to all apps."""
+    """Return new SessionSpec with defaults applied to all apps.
+
+    Note: Creates O(workspaces * apps) frozen copies. Fine at current scale
+    but would need rethinking for multi-session orchestration.
+    """
     default_timeout = spec.options.default_startup_timeout_s
     new_workspaces = []
     for ws in spec.workspaces:
