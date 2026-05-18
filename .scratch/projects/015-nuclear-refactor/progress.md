@@ -10,5 +10,5 @@
 - [x] Step 8: Updated `src/nirip/__main__.py` to v2 cli entrypoint.
 - [x] Step 9: Verified legacy package tree removed; only flat v2 modules remain.
 - [x] Step 10: Built new v2 test suite from scratch (18 tests across spec/resolve/plan/execute/capture/cli/integration).
-- [ ] Step 11: Optional version bump in `pyproject.toml`.
+- [x] Step 11: Bumped version in `pyproject.toml` to 1.0.0.
 - [ ] Step 12: Final validation suite.
