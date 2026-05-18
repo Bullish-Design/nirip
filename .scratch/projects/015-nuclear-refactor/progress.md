@@ -11,4 +11,4 @@
 - [x] Step 9: Verified legacy package tree removed; only flat v2 modules remain.
 - [x] Step 10: Built new v2 test suite from scratch (18 tests across spec/resolve/plan/execute/capture/cli/integration).
 - [x] Step 11: Bumped version in `pyproject.toml` to 1.0.0.
-- [ ] Step 12: Final validation suite.
+- [x] Step 12: Final validation complete (pytest, import smoke, CLI help, ty, ruff lint/format, line counts).
