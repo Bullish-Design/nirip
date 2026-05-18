@@ -36,11 +36,11 @@ class MatchRule(BaseModel):
     title: str | None = None
     title_regex: str | None = None
     pid: int | None = None
-    any_of: list["MatchRule"] | None = Field(None, validation_alias="any")
-    not_rule: "MatchRule" | None = Field(None, validation_alias="not")
+    any_of: list[MatchRule] | None = Field(None, validation_alias="any")
+    not_rule: MatchRule | None = Field(None, validation_alias="not")
 
     @model_validator(mode="after")
-    def _validate_not_empty(self) -> "MatchRule":
+    def _validate_not_empty(self) -> MatchRule:
         has_leaf = any(
             [
                 self.app_id,
@@ -76,7 +76,7 @@ class PlacementSpec(BaseModel):
     window_height: float | str | None = None
 
     @model_validator(mode="after")
-    def _validate_mutual_exclusion(self) -> "PlacementSpec":
+    def _validate_mutual_exclusion(self) -> PlacementSpec:
         if self.floating and self.fullscreen:
             raise ValueError("floating and fullscreen are mutually exclusive")
         return self
@@ -233,9 +233,7 @@ def _check_weak_matchers(spec: SessionSpec, warnings: list[str]) -> None:
         for app in ws.apps:
             m = app.match
             if m.title_regex and not any([m.app_id, m.app_id_regex, m.title, m.pid]):
-                warnings.append(
-                    f"weak matcher in {ws.name}/{app.name}: title_regex-only rules can be unstable"
-                )
+                warnings.append(f"weak matcher in {ws.name}/{app.name}: title_regex-only rules can be unstable")
 
 
 def _check_inter_app_conflicts(spec: SessionSpec, warnings: list[str]) -> None:

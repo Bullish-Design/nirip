@@ -185,11 +185,14 @@ async def _execute_step(step: PlanStep, ports: SessionPorts, apps: dict[str, _Ap
 
         case StepKind.WAIT_FOR_WINDOW:
             matched_wid: int | None = None
+            rule = step.match
+            if rule is None:
+                return StepResult(step=step, outcome=StepOutcome.FAILED, message="missing match rule")
 
             def predicate(snap: Any) -> bool:
                 nonlocal matched_wid
                 for w in snap.windows.values():
-                    matched, _ = evaluate_rule(step.match, w)
+                    matched, _ = evaluate_rule(rule, w)
                     if matched:
                         matched_wid = w.id
                         return True
@@ -227,17 +230,18 @@ async def _execute_step(step: PlanStep, ports: SessionPorts, apps: dict[str, _Ap
             wid = _resolve_wid(step, apps)
             if wid is None:
                 return StepResult(step=step, outcome=StepOutcome.FAILED, message="window ID not yet available")
+            wid_int = wid
             target_workspace = step.workspace_name or ""
             workspace_ref = actions.workspace_by_name(target_workspace)
-            await _request(ports.client, actions.move_window_to_workspace(workspace_ref, window_id=wid))
+            await _request(ports.client, actions.move_window_to_workspace(workspace_ref, window_id=wid_int))
 
             def moved(snap: Snapshot) -> bool:
-                w = snap.windows.get(wid)
+                w = snap.windows.get(wid_int)
                 target = next((ws for ws in snap.workspaces.values() if ws.name == target_workspace), None)
                 return w is not None and target is not None and w.workspace_id == target.id
 
             await _wait(ports.state, moved, timeout=5.0)
-            return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="window moved", window_id=wid)
+            return StepResult(step=step, outcome=StepOutcome.COMPLETED, message="window moved", window_id=wid_int)
 
         case StepKind.SET_STATE:
             wid = _resolve_wid(step, apps)

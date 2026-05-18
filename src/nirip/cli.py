@@ -12,7 +12,7 @@ import yaml
 from nirip.execute import ApplyResult, SessionPorts, execute_plan
 from nirip.plan import Plan, build_plan
 from nirip.resolve import Resolution, ResolutionStatus, resolve
-from nirip.spec import NiripError, load_from_file
+from nirip.spec import load_from_file
 
 
 def format_resolution(resolution: Resolution) -> str:
