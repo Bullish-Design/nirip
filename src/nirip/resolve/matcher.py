@@ -3,12 +3,18 @@
 from __future__ import annotations
 
 import re
+from functools import lru_cache
 from collections.abc import Iterable
 
 from niri_pypc.types.generated.models import Window
 
 from nirip.resolve.models import MatchCandidate, MatchDecision, MatchTier
 from nirip.spec.models import AppSpec, MatchRule
+
+
+@lru_cache(maxsize=256)
+def _compile(pattern: str) -> re.Pattern[str]:
+    return re.compile(pattern)
 
 
 def evaluate_rule(rule: MatchRule, window: Window) -> tuple[bool, MatchTier, list[str]]:
@@ -26,7 +32,7 @@ def evaluate_rule(rule: MatchRule, window: Window) -> tuple[bool, MatchTier, lis
             reasons.append(f"app_id mismatch: wanted {rule.app_id}, got {window.app_id}")
 
     if rule.app_id_regex is not None:
-        if window.app_id and re.search(rule.app_id_regex, window.app_id):
+        if window.app_id and _compile(rule.app_id_regex).search(window.app_id):
             best_tier = max(best_tier, MatchTier.STRONG)
             reasons.append(f"app_id_regex: {rule.app_id_regex}")
         else:
@@ -42,7 +48,7 @@ def evaluate_rule(rule: MatchRule, window: Window) -> tuple[bool, MatchTier, lis
             reasons.append(f"title mismatch: wanted {rule.title}, got {window.title}")
 
     if rule.title_regex is not None:
-        if window.title and re.search(rule.title_regex, window.title):
+        if window.title and _compile(rule.title_regex).search(window.title):
             best_tier = max(best_tier, MatchTier.WEAK)
             reasons.append(f"title_regex: {rule.title_regex}")
         else:
