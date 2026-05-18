@@ -35,9 +35,9 @@ def load_session(path: str | Path) -> ValidatedSpec:
     return load_spec_from_file(path)
 
 
-def apply_session(spec: SessionSpec) -> ApplyResult:
+def apply_session(spec: SessionSpec, config: NiripConfig | None = None) -> ApplyResult:
     async def _run() -> ApplyResult:
-        async with await AsyncNirip.open() as nirip:
+        async with await AsyncNirip.open(config) as nirip:
             return await nirip.apply(spec)
 
     return asyncio.run(_run())
