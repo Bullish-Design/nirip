@@ -12,6 +12,7 @@ from niri_state import HealthState, NiriState, Snapshot
 from nirip.capture.capturer import CapturedSession, capture_from_snapshot
 from nirip.config import NiripConfig
 from nirip.execution.executor import execute_plan
+from nirip.execution.hooks import ExecutionHook
 from nirip.execution.models import ApplyResult, SessionPorts
 from nirip.planning.compiler import compile_diff, compile_plan
 from nirip.planning.models import Plan, SessionDiff
@@ -54,13 +55,13 @@ class AsyncNirip:
         resolution = resolve(spec, self.snapshot)
         return compile_plan(resolution, spec.options)
 
-    async def apply(self, spec: SessionSpec) -> ApplyResult:
+    async def apply(self, spec: SessionSpec, hook: ExecutionHook | None = None) -> ApplyResult:
         resolution = resolve(spec, self.snapshot)
         plan = compile_plan(resolution, spec.options)
         if plan.is_empty:
             return ApplyResult(session_name=spec.name, success=True, steps=[], total_duration_s=0.0)
         ports = SessionPorts(state=self._state, client=self._client)
-        return await execute_plan(plan, ports, spec.options)
+        return await execute_plan(plan, ports, spec.options, hook=hook)
 
     async def capture(self, *, name: str | None = None) -> CapturedSession:
         return capture_from_snapshot(self.snapshot, name=name)

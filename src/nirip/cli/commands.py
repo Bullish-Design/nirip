@@ -9,11 +9,18 @@ from pathlib import Path
 import yaml
 
 from nirip.cli.formatting import format_diff, format_plan, format_result
+from nirip.execution.hooks import LoggingHook
 from nirip.facade.async_nirip import AsyncNirip
 from nirip.spec.loader import load_spec_from_file
 
 
-async def cmd_apply(session_file: str, *, yes: bool = False, dry_run: bool = False) -> str:
+async def cmd_apply(
+    session_file: str,
+    *,
+    yes: bool = False,
+    dry_run: bool = False,
+    quiet: bool = False,
+) -> str:
     validated = load_spec_from_file(session_file)
     for w in validated.validation.warnings:
         print(f"  warning: {w}", file=sys.stderr)
@@ -31,7 +38,8 @@ async def cmd_apply(session_file: str, *, yes: bool = False, dry_run: bool = Fal
                 if answer.lower() != "y":
                     return "Aborted."
 
-        result = await nirip.apply(validated.spec)
+        hook = None if quiet else LoggingHook()
+        result = await nirip.apply(validated.spec, hook=hook)
         return format_result(result)
 
 

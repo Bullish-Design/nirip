@@ -7,18 +7,26 @@ import time
 from niri_state import WaitTimeoutError
 
 from nirip.execution.handlers import execute_step
+from nirip.execution.hooks import ExecutionHook, NullHook
 from nirip.execution.models import ApplyResult, SessionPorts, StepOutcome, StepResult
 from nirip.execution.runtime import AppRuntimeState, SessionRuntime
 from nirip.planning.models import Plan
 from nirip.spec.models import SessionOptions
 
 
-async def execute_plan(plan: Plan, ports: SessionPorts, options: SessionOptions) -> ApplyResult:
+async def execute_plan(
+    plan: Plan,
+    ports: SessionPorts,
+    options: SessionOptions,
+    hook: ExecutionHook | None = None,
+) -> ApplyResult:
     t0 = time.monotonic()
+    exec_hook = hook or NullHook()
     runtime = _init_runtime(plan)
 
     results: list[StepResult] = []
     for step in plan.steps:
+        exec_hook.on_step_start(step)
         t_step = time.monotonic()
         try:
             result = await execute_step(step, ports, runtime)
@@ -38,16 +46,19 @@ async def execute_plan(plan: Plan, ports: SessionPorts, options: SessionOptions)
             )
         if result.duration_s == 0.0:
             result = result.model_copy(update={"duration_s": time.monotonic() - t_step})
+        exec_hook.on_step_complete(step, result)
         results.append(result)
         if result.outcome in (StepOutcome.FAILED, StepOutcome.TIMED_OUT) and options.stop_on_error:
             break
 
-    return ApplyResult(
+    apply_result = ApplyResult(
         session_name=plan.session_name,
         success=all(r.outcome in (StepOutcome.COMPLETED, StepOutcome.SKIPPED) for r in results),
         steps=results,
         total_duration_s=time.monotonic() - t0,
     )
+    exec_hook.on_plan_complete(apply_result)
+    return apply_result
 
 
 def _init_runtime(plan: Plan) -> SessionRuntime:
