@@ -91,6 +91,7 @@ def resolve(spec: SessionSpec, snapshot: Snapshot) -> Resolution:
 _PROPERTY_CHECKS: list[tuple[DriftKind, str, str]] = [
     (DriftKind.WRONG_FLOATING, "is_floating", "floating"),
     (DriftKind.WRONG_FULLSCREEN, "is_fullscreen", "fullscreen"),
+    (DriftKind.WRONG_MAXIMIZED, "is_maximized", "maximized"),
 ]
 
 
@@ -117,15 +118,5 @@ def _detect_drift(
         desired_val: Any = getattr(app_spec.placement, place_attr)
         if current_val != desired_val:
             drift.append(DriftItem(kind=kind, current=str(current_val), desired=str(desired_val)))
-
-    if hasattr(window, "is_maximized"):
-        if window.is_maximized != app_spec.placement.maximized:
-            drift.append(
-                DriftItem(
-                    kind=DriftKind.WRONG_MAXIMIZED,
-                    current=str(window.is_maximized),
-                    desired=str(app_spec.placement.maximized),
-                )
-            )
 
     return drift
