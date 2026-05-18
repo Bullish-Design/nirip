@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import re
-from functools import lru_cache
 from collections.abc import Iterable
+from functools import lru_cache
 
 from niri_pypc.types.generated.models import Window
 
-from nirip.resolve.models import MatchCandidate, MatchDecision, MatchTier
+from nirip.resolve.assigner import GreedyAssigner
+from nirip.resolve.models import MatchCandidate, MatchDecision, MatchTier, WindowAssigner
 from nirip.spec.models import AppSpec, MatchRule
+
+_DEFAULT_ASSIGNER = GreedyAssigner()
 
 
 @lru_cache(maxsize=256)
@@ -88,7 +91,11 @@ def evaluate_rule(rule: MatchRule, window: Window) -> tuple[bool, MatchTier, lis
     return True, best_tier, reasons
 
 
-def assign_windows(apps: list[tuple[str, AppSpec]], windows: Iterable[Window]) -> list[MatchDecision]:
+def assign_windows(
+    apps: list[tuple[str, AppSpec]],
+    windows: Iterable[Window],
+    assigner: WindowAssigner = _DEFAULT_ASSIGNER,
+) -> list[MatchDecision]:
     """Globally consistent 1:1 app-to-window assignment."""
     window_list = list(windows)
 
@@ -101,22 +108,7 @@ def assign_windows(apps: list[tuple[str, AppSpec]], windows: Iterable[Window]) -
                 candidates.append(MatchCandidate(window_id=w.id, tier=tier, reasons=reasons))
         all_candidates.append(candidates)
 
-    triples: list[tuple[int, int, MatchTier]] = []
-    for app_idx, candidates in enumerate(all_candidates):
-        for c in candidates:
-            triples.append((app_idx, c.window_id, c.tier))
-    triples.sort(key=lambda t: t[2], reverse=True)
-
-    assigned_app: set[int] = set()
-    assigned_window: set[int] = set()
-    app_to_window: dict[int, int] = {}
-
-    for app_idx, window_id, _tier in triples:
-        if app_idx in assigned_app or window_id in assigned_window:
-            continue
-        app_to_window[app_idx] = window_id
-        assigned_app.add(app_idx)
-        assigned_window.add(window_id)
+    app_to_window = assigner.assign(apps, all_candidates)
 
     decisions: list[MatchDecision] = []
     for app_idx, (ws_name, app_spec) in enumerate(apps):

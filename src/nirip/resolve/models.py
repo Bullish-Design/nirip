@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from enum import IntEnum, StrEnum
+from typing import Protocol
 
 from pydantic import computed_field
 
@@ -24,6 +25,18 @@ class MatchCandidate(NiripModel):
     window_id: int
     tier: MatchTier
     reasons: list[str]
+
+
+class WindowAssigner(Protocol):
+    """Strategy for 1:1 app-to-window assignment."""
+
+    def assign(
+        self,
+        apps: list[tuple[str, AppSpec]],
+        candidates: list[list[MatchCandidate]],
+    ) -> dict[int, int]:
+        """Return mapping of app index to assigned window id."""
+        ...
 
 
 class MatchDecision(NiripModel):
