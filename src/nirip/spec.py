@@ -240,8 +240,10 @@ def _check_weak_matchers(spec: SessionSpec, warnings: list[str]) -> None:
     for ws in spec.workspaces:
         for app in ws.apps:
             m = app.match
-            if m.title_regex and not any([m.app_id, m.app_id_regex, m.title, m.pid]):
-                warnings.append(f"weak matcher in {ws.name}/{app.name}: title_regex-only rules can be unstable")
+            has_strong = any([m.app_id, m.app_id_regex, m.pid])
+            if (m.title or m.title_regex) and not has_strong:
+                kind = "title-only" if m.title and not m.title_regex else "title_regex-only"
+                warnings.append(f"weak matcher in {ws.name}/{app.name}: {kind} rules can be unstable")
 
 
 def _check_inter_app_conflicts(spec: SessionSpec, warnings: list[str]) -> None:

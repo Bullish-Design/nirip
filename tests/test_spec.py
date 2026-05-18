@@ -84,3 +84,25 @@ def test_load_from_dict_success_tuple() -> None:
     )
     assert isinstance(spec, SessionSpec)
     assert report.valid is True
+
+
+def test_validate_session_weak_title_only_matcher() -> None:
+    spec = SessionSpec.model_validate(
+        {
+            "name": "s",
+            "workspaces": [{"name": "ws", "apps": [{"name": "firefox", "match": {"title": "Firefox"}}]}],
+        }
+    )
+    result = validate_session(spec)
+    assert any("title-only rules can be unstable" in w for w in result.warnings)
+
+
+def test_validate_session_weak_title_regex_only_matcher() -> None:
+    spec = SessionSpec.model_validate(
+        {
+            "name": "s",
+            "workspaces": [{"name": "ws", "apps": [{"name": "firefox", "match": {"title_regex": "Firefox"}}]}],
+        }
+    )
+    result = validate_session(spec)
+    assert any("title_regex-only rules can be unstable" in w for w in result.warnings)
